@@ -5,7 +5,8 @@
  *      Author: GauchoHP
  *      Common functions for C1baccable
  */
-#include <functions_C1baccable.h>
+#include "functions_C1baccable.h" 	//<> changed by @netzmark
+#include "functions_Common.h" 		// added by @netzmark
 
 	extern uint32_t _end;      // Fine della sezione .bss (fornito dal linker)
 	extern uint32_t _estack;   // Top dello stack (fornito dal linker)
@@ -110,9 +111,7 @@
 
 		if(instructSlaveBoardsTriggerEnabled){
 			if((currentTime-allProcessorsWakeupTime)>TIMING__C1____DELAY_BEFORE_SERIAL_INSTRUCT_OF_C2BH_AFTER_OTHER_CHIP_WAKE_MS){
-				//onboardLed_red_blink(5);
 				instructSlaveBoardsTriggerEnabled=0; //avoid to return here
-
 
 				//send messages to slave boards
 				uint8_t tmpArr0[2]={C2_Bh_BusID,C2_Bh_cmdFunction_ESC_TC_Enabled};
@@ -943,7 +942,7 @@
 
 	void buildLineWithFormat(const char* template, float values[2], const uint8_t paramId[2], char* result) {
 		//onboardLed_red_blink(5);
-	    int i = 0;   // indice output
+	    uint8_t i = 0;   // indice output //by @netzmark "int i = 0" > "uint8_t i = 0"
 	    int which = 0; // 0 = val1, 1 = val2
 
 	    for (const char* p = template; *p && i < DASHBOARD_MESSAGE_MAX_LENGTH; p++) {
@@ -955,7 +954,7 @@
 							int y = *(p+3) - '0'; // decimali
 							int maxLen = n + (y>0 ? 1 : 0) + y;
 
-							char buf[maxLen+1]; // buffer dimensionato sul campo
+							//char buf[maxLen+1]; // buffer dimensionato sul campo //commented by @netzmark together with the further changes related to printf "appendFloat"
 
 							switch(single_uds_params_array[paramId[which]].reqId){
 								case 0x1A: //0-100 stat
@@ -965,8 +964,19 @@
 										if(statistics_0_100_started){
 											for (const char* q=speedStatisticEnumStrings[1]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //GO
 										}else{ //show time
-											floatToStr(buf, values[which], y, maxLen+1);
-											for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
+											//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
+											//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+
+											/* @netzmark printf_$ improvement - BEGIN
+											 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
+											 */
+											appendFloatRightAligned(result,
+											                        &i,
+											                        DASHBOARD_MESSAGE_MAX_LENGTH,
+											                        values[which],
+											                        y,
+											                        maxLen);
+											/* @netzmark section - END */
 										}
 									}
 									break;
@@ -977,8 +987,19 @@
 										if(statistics_100_200_started){
 											for (const char* q=speedStatisticEnumStrings[1]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //GO
 										}else{ //show time
-											floatToStr(buf, values[which], y, maxLen+1);
-											for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
+											//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
+											//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+
+											/* @netzmark printf_$ improvement - BEGIN
+											 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
+											 */
+											appendFloatRightAligned(result,
+											                        &i,
+											                        DASHBOARD_MESSAGE_MAX_LENGTH,
+											                        values[which],
+											                        y,
+											                        maxLen);
+											/* @netzmark section - END */
 										}
 									}
 									break;
@@ -986,23 +1007,55 @@
 									if(values[which]>20.0){ //missed
 										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
 									}else{
-										floatToStr(buf, values[which], y, maxLen+1);
-										for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
+										//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
+										//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+
+										/* @netzmark printf_$ improvement - BEGIN
+										 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
+										 */
+										appendFloatRightAligned(result,
+										                        &i,
+										                        DASHBOARD_MESSAGE_MAX_LENGTH,
+										                        values[which],
+										                        y,
+										                        maxLen);
+										/* @netzmark section - END */
 									}
 									break;
 								case 0x1D: //Best 100-200
 									if(values[which]>40.0){ //missed
 										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
 									}else{
-										floatToStr(buf, values[which], y, maxLen+1);
-										for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
+										//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
+										//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+
+										/* @netzmark printf_$ improvement - BEGIN
+										 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
+										 */
+										appendFloatRightAligned(result,
+										                        &i,
+										                        DASHBOARD_MESSAGE_MAX_LENGTH,
+										                        values[which],
+										                        y,
+										                        maxLen);
+										/* @netzmark section - END */
 									}
 									break;
 
 								default:
-									floatToStr(buf, values[which], y, maxLen+1);
+									//floatToStr(buf, values[which], y, maxLen+1); 														//by @netzmark for "appendFloat"
+									//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
 
-									for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
+									/* @netzmark printf_$ improvement - BEGIN
+									 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
+									 */
+									appendFloatRightAligned(result,
+									                        &i,
+									                        DASHBOARD_MESSAGE_MAX_LENGTH,
+									                        values[which],
+									                        y,
+									                        maxLen);
+									/* @netzmark section - END */
 							}
 
 

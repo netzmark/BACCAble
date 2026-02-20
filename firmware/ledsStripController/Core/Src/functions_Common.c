@@ -7,110 +7,136 @@
 
 #include "functions_Common.h"
 #include "debug.h"
+#include <math.h>	//@netzmark for "appendFloat" related to printf improvement
+					//it is in globalVariables.h but better have it here independently
 
-void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen) {
+/*
+ * @netzmark printf_$ improvement
+ * floatToStr()
+ * Converts a float to a null-terminated string with fixed decimal precision.
+ * Handles NaN/Inf, applies rounding, and ensures buffer safety.
+ * Does NOT perform alignment or field-width formatting.
+ */
 
-    uint8_t i = 0;
+void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
+{
+    if (maxLen == 0)
+        return;
 
-    // Gestione dei casi speciali NaN e Inf
-    if (num != num) {  // NaN check
-        memset(&str[0], ' ', maxLen-1); //pad with spaces
-        str[maxLen - 1] = '\0';
+    char* ptr = str;
+    char* end = str + maxLen - 1;   // // reserve space for null terminator ('\0')
+
+    // --- NaN ---
+    if (isnan(num)) {
+        if (ptr < end) *ptr++ = 'n';
+        if (ptr < end) *ptr++ = 'a';
+        if (ptr < end) *ptr++ = 'n';
+        *ptr = '\0';
         return;
     }
-    if (num == (float)INFINITY) {
-        if (maxLen > 3) {
-            str[0] = 'I'; str[1] = 'n'; str[2] = 'f'; str[3] = '\0';
-        }
-        return;
-    }
-    if (num == (float)-INFINITY) {
-        if (maxLen > 4) {
-            str[0] = '-'; str[1] = 'I'; str[2] = 'n'; str[3] = 'f'; str[4] = '\0';
-        }
+
+    // --- Inf ---
+    if (isinf(num)) {
+        if (num < 0 && ptr < end)
+            *ptr++ = '-';
+
+        if (ptr < end) *ptr++ = 'i';
+        if (ptr < end) *ptr++ = 'n';
+        if (ptr < end) *ptr++ = 'f';
+        *ptr = '\0';
         return;
     }
 
-    // Calcolo del fattore di arrotondamento corretto
-    float roundingFactor = 0.5f;
-    for (uint8_t j = 0; j < precision; j++) {
-        roundingFactor /= 10.0f;
-    }
+    // --- Rounding ---
+    float rounding = 0.5f;
+    for (uint8_t i = 0; i < precision; i++)
+        rounding /= 10.0f;
+
+    num += (num < 0) ? -rounding : rounding;
+
+    // --- Sign ---
     if (num < 0) {
-        num -= roundingFactor;  // Arrotondamento corretto per numeri negativi
-    } else {
-        num += roundingFactor;  // Arrotondamento per numeri positivi
-    }
-
-    // Gestione del segno
-    if (num < 0) {
-        if (i < maxLen - 1) {
-            str[i++] = '-';
-        }
+        if (ptr < end)
+            *ptr++ = '-';
         num = -num;
     }
 
-    // Parte intera e parte decimale
     uint32_t intPart = (uint32_t)num;
-    uint32_t scale = 1;
-    for (uint8_t j = 0; j < precision; j++) {
-        scale *= 10;
-    }
-    uint32_t decPart = (uint32_t)((num - intPart) * scale);
+    float remainder = num - intPart;
 
-    // Conversione della parte intera
-    uint8_t intStart = i;
-    if (intPart == 0) {
-        if (i < maxLen - 1) {
-            str[i++] = '0';
-        }
-    } else {
-        uint8_t count = 0;
-        uint32_t tmp = intPart;
-        while (tmp > 0) {
-            tmp /= 10;
-            count++;
-        }
-        for (uint8_t j = count; j > 0; j--) {
-            if (i < maxLen - 1) {
-                str[i + j - 1] = (intPart % 10) + '0';
-            }
-            intPart /= 10;
-        }
-        i += count;
-    }
+    // --- Integer part ---
+    char temp[12];
+    int intLen = 0;
 
-    // Conversione della parte decimale
-    if (precision > 0 && i < maxLen - 1) {
-        str[i++] = '.';
-        for (uint8_t j = 0; j < precision; j++) {
-            if (i < maxLen - 1) {
-                decPart *= 10;
-                str[i++] = (decPart / scale) + '0';
-                decPart %= scale;
-            }
+    do {
+        temp[intLen++] = (intPart % 10) + '0';
+        intPart /= 10;
+    } while (intPart && intLen < (int)sizeof(temp));
+
+    while (intLen-- && ptr < end)
+        *ptr++ = temp[intLen];
+
+    // --- Fractional part ---
+    if (precision > 0 && ptr < end) {
+        *ptr++ = '.';
+
+        while (precision-- && ptr < end) {
+            remainder *= 10.0f;
+            int digit = (int)remainder;
+            *ptr++ = digit + '0';
+            remainder -= digit;
         }
     }
 
-    // Rimuovere zeri finali superflui
-    if (precision > 0) {
-        while (i > intStart && str[i - 1] == '0') {
-            str[--i] = '\0';
-        }
-        if (i > intStart && str[i - 1] == '.') {
-            str[--i] = '\0';
-        }
-    }
-
-    // Aggiungere terminatore di stringa
-    if (i < maxLen) {
-    	memset(&str[i], ' ', maxLen-i-1); //pad with spaces
-        str[maxLen - 1] = '\0'; //if instead we want to close the string without padding, we would just need str[i] = '\0' without memset.
-    } else if (maxLen > 0) {
-        str[maxLen - 1] = '\0';
-    }
+    *ptr = '\0';
 }
 
+/*
+ * appendFloatRightAligned()
+ * Appends a float to the output buffer as a fixed-width, right-aligned field.
+ * Inserts spaces for invalid values (NaN/Inf) and '#' on overflow.
+ * Responsible for field width, padding, and visual layout.
+ */
+void appendFloatRightAligned(char* result,
+                             uint8_t* index,
+                             uint8_t resultMaxLen,
+                             float value,
+                             uint8_t precision,
+                             uint8_t fieldWidth)
+{
+    // 1️. Invalid data → empty field
+    if (isnan(value) || isinf(value))
+    {
+        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
+            result[(*index)++] = '-';		//or ' ' if better looking
+        return;
+    }
+
+    // 2️. Convert number safely
+    char buf[32];
+    floatToStr(buf, value, precision, sizeof(buf));
+
+    uint8_t len = strlen(buf);
+
+    // 3️. Overflow protection
+    if (len > fieldWidth)
+    {
+        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
+            result[(*index)++] = '#';
+        return;
+    }
+
+    // 4️. Left padding
+    uint8_t pad = fieldWidth - len;
+
+    for (uint8_t k = 0; k < pad && *index < resultMaxLen; k++)
+        result[(*index)++] = ' ';
+
+    // 5️. Copy value
+    for (uint8_t k = 0; k < len && *index < resultMaxLen; k++)
+        result[(*index)++] = buf[k];
+}
+/* Section added by @netzmark - END*/
 
 
 uint8_t calculateCRC(uint8_t* data, uint8_t arraySize) {
