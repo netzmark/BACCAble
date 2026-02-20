@@ -130,6 +130,13 @@ uint8_t calculateCRC(uint8_t* data, uint8_t arraySize) {
 
 
 //System Clock Configuration
+
+/* HSI/HSE configuration added by @netzmark - BEGINING */
+
+#if !defined(HSE_ENABLED_FOR_UCAN)
+// System Clock Configuration for HSI (Gaucho's ori code)
+// It means this is Baccable/Canable standard clock configuration
+
 void SystemClock_Config(void){
   HAL_Init();
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -157,8 +164,6 @@ void SystemClock_Config(void){
   crs.HSI48CalibrationValue = 0x20;
   HAL_RCCEx_CRSConfig(&crs);
 
-
-
   /** Initializes the CPU, AHB and APB buses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
@@ -184,7 +189,59 @@ void SystemClock_Config(void){
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
 }
+#endif
 
+#if defined(HSE_ENABLED_FOR_UCAN)
+// Configuration the boards for HSE (external oscillator) using - BEGIN ; by @netzmark
+
+void SystemClock_Config(void) {
+  HAL_Init();
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** 1. HSE oscillator and PLL loop configuration
+  * HSI48 disabled, HSE (8MHz) enabled
+  * PLL: 8MHz * 6 = 48MHz
+  */
+
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;             // External oscillator ON
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE; // external oscillator is set as the source for PLL
+  RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;         // Multiplication x6 for dla 8MHz external oscillator (8*6=48)
+
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+    Error_Handler(2000);
+  }
+
+  /** 2. Bus clock initialisation (SYSCLK = 48MHz z PLL)
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK; // System starts with PLL
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK) {
+    Error_Handler(1500);
+  }
+
+  /** 3. Setting clock source for USB device
+  * Changed from HSI48 onto signal from PLL
+  */
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLLCLK; // USB gets stable clock from PLL(HSE)
+
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK) {
+    Error_Handler(1000);
+  }
+   //__HAL_FLASH_PREFETCH_BUFFER_ENABLE(); // it seems to be not necessary as it is applied by HAL_init().
+   __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+#endif
+//System Clock Configuration for HSE/HSI - END ; by @netzmark
 
 void Error_Handler(uint16_t halfPeriod){
 	//onboardLed_red_on();
