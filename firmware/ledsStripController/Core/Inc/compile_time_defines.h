@@ -51,7 +51,7 @@
 	#ifndef LARGE_DISPLAY//optional compile time define with -D, default: undefined
 		#define DASHBOARD_MESSAGE_MAX_LENGTH 18
 	#else
-		#define DASHBOARD_MESSAGE_MAX_LENGTH 24
+		#define DASHBOARD_MESSAGE_MAX_LENGTH 28 // @netzmark: ori was 24 but it limits the length of the stings too much
 	#endif
 
 	//This section sets ACT_AS_CANABLE if no option was selected

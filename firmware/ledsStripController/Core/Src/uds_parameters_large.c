@@ -1,13 +1,14 @@
 #include "uds_parameters.h"
 
-/* The basic SHORT DISPLAY PARAMETERS' names */
+/* The basic LARGE DISPLAY PARAMETERS' names */
 
 /* 	!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	THE NEXT STEP WILL BE NEW PRINTF AND THE TEXTS WILL HAVE TO BE MODIFIED FOR ITS COMPATIBILITY
 	FLOAT PARAMETERS OF PRINTF MUST BE STILL ADJUSTED TO NEW NETZMARK FORM
+	ON THE MOMENT IT IS STILL THE FILE CONTAINING THE SAME TEXTS AS uds_parameters.c
 */
 
-#if !defined(LARGE_DISPLAY)					//by @netzmark
+#if defined(LARGE_DISPLAY)					//by @netzmark
 
 	float dashboardParamCouple[2];
 
