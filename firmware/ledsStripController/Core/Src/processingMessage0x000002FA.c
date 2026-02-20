@@ -67,7 +67,7 @@ void processingMessage0x000002FA(){
 			if(ACC_engaged){
 				if(carSteadyCounter==200 && brakeIntervention_ACC_ESC_ASR){ //if car is steady and brake is pressed by ACC
 					if(rx_msg_data[0]==0x10){ //if no button was pressed on cruise control pad
-						if (currentTime-lastSentAutostartMsg>500){ //once each 1,5 seconds
+						if (currentTime-lastSentAutostartMsg>150){ 	// @netzmark: ori it was 500 (once each 1,5 seconds), 150 for me works better
 							rx_msg_data[0] = 0x90; //Res button press
 
 							if(function_acc_autostart==2){
@@ -80,7 +80,7 @@ void processingMessage0x000002FA(){
 							rx_msg_data[0]=0x10; //restore value 10 to avoid unwanted behaviours with subsequent pieces of code
 							//increase a counter
 							AutostartMsgCounter++;
-							if (AutostartMsgCounter>= 5){ //we are simulating a 100msec button press event
+							if (AutostartMsgCounter>= 3){ 			// @netzmark: ori it was 5 (simulating a 100msec button press event), I do it 3 with relation to line 70
 								AutostartMsgCounter=0;
 								lastSentAutostartMsg=currentTime;
 							}
@@ -777,7 +777,7 @@ void processingMessage0x000002FA(){
 					if(currentGear==0){ //gear is neutral
 						if((rx_msg_data[0]==0x08) && ((wheelPressedButtonID==0x10) || (wheelPressedButtonID==0x08))){ //user is pressing CC soft speed up button and it was previously released (or pressed by baccable menu up here)
 							lastPressedSpeedUpWheelButtonDuration++;
-							if(lastPressedSpeedUpWheelButtonDuration>1267){ //around 30 seconds
+							if(lastPressedSpeedUpWheelButtonDuration>422){ 	// @netzmark: originally it was 1267 (around 30s), I do it faster around 10s.
 								//avoid to return here
 								wheelPressedButtonID=0xF8; //invent a new status to differentiate it from 0x08 used in baccable menu few lines of code up here
 								lastPressedSpeedUpWheelButtonDuration=0; //unuseful here since it is done when button is released. just to be superstitious :-D.
