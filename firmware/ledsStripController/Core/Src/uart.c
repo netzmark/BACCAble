@@ -74,55 +74,108 @@ void uart_init(){
     //onboardLed_blue_blink(10); //ok
 }
 
-//pause uart2
-void pauseUart2(void){
-	__HAL_UART_DISABLE_IT(&huart2, UART_IT_RXNE); //disable RX interrupt (RXNE)
-    __HAL_UART_DISABLE_IT(&huart2, UART_IT_ERR); //disable error interrupts (ORE overrun, FE framing, NE noise)
 
-    // delete correctly all UARTS errors
-    __HAL_UART_CLEAR_FLAG(&huart2,UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF | UART_CLEAR_PEF);
+void pauseUart2(void)
+{
+    /* Disable USART2 IRQ globally to avoid race with ISR */
+    HAL_NVIC_DisableIRQ(USART2_IRQn);
 
-    // Clear hardware error flags
-	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_OREF);
-	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_FEF);
-	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_NEF);
+    /* Disable RX and error interrupts */
+    __HAL_UART_DISABLE_IT(&huart2, UART_IT_RXNE);
+    __HAL_UART_DISABLE_IT(&huart2, UART_IT_ERR);
 
-	// Clear RXNE by flushing the data register
-	__HAL_UART_FLUSH_DRREGISTER(&huart2);
+    /* Flush RX data register */
+    __HAL_UART_FLUSH_DRREGISTER(&huart2);
 
+    /* Clear UART error flags */
+    __HAL_UART_CLEAR_FLAG(&huart2,
+        UART_CLEAR_OREF |
+        UART_CLEAR_FEF  |
+        UART_CLEAR_NEF  |
+        UART_CLEAR_PEF);
 
-	// Reset HAL internal state
-	huart2.RxXferCount = 0;
-	huart2.RxXferSize  = 0;
-	huart2.pRxBuffPtr  = NULL;
-	huart2.ErrorCode   = HAL_UART_ERROR_NONE;
-	//onboardLed_red_blink(20);
-
-    //huart2.State = HAL_UART_STATE_READY; //return to READY state
-
+    /* Reset HAL state */
+    huart2.State     = HAL_UART_STATE_READY;
+    huart2.ErrorCode = HAL_UART_ERROR_NONE;
 }
 
-//wake up serial line after pause
-void restartUart2(void){
-	//HAL_Delay(1);
-	syncObtained = 0; // sync lost
+void restartUart2(void)
+{
+    /* Protocol sync lost */
+    syncObtained = 0;
 
-	// delete correctly all UARTS errors
-	__HAL_UART_CLEAR_FLAG(&huart2,UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF | UART_CLEAR_PEF);
+    /* Ensure RX buffer is clean */
+    __HAL_UART_FLUSH_DRREGISTER(&huart2);
+    __HAL_UART_CLEAR_FLAG(&huart2,
+        UART_CLEAR_OREF |
+        UART_CLEAR_FEF  |
+        UART_CLEAR_NEF  |
+        UART_CLEAR_PEF);
 
-	// Clear RXNE by flushing the data register
-	__HAL_UART_FLUSH_DRREGISTER(&huart2);
+    /* Re-enable USART2 IRQ */
+    HAL_NVIC_EnableIRQ(USART2_IRQn);
 
+    /* Re-enable RX and error interrupts */
+    __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE);
+    __HAL_UART_ENABLE_IT(&huart2, UART_IT_ERR);
 
-	// Reset HAL internal state
-	huart2.RxXferCount = 0;
-	huart2.RxXferSize  = 0;
-	huart2.pRxBuffPtr  = NULL;
-	huart2.ErrorCode   = HAL_UART_ERROR_NONE;
+    /* Start RX for single byte */
+    HAL_UART_Receive_IT(&huart2, rxBuffer, 1);
 
-	HAL_UART_Receive_IT(&huart2, &rxBuffer[0], 1);  //restart receiving one byte
-	last_sent_serial_msg_time=currentTime; //avoid to send message in the same moment when interrupt was restarted
+    /* Avoid TX immediately after RX restart */
+    last_sent_serial_msg_time = currentTime;
 }
+
+
+////pause uart2
+//void pauseUart2(void){
+//	__HAL_UART_DISABLE_IT(&huart2, UART_IT_RXNE); //disable RX interrupt (RXNE)
+//    __HAL_UART_DISABLE_IT(&huart2, UART_IT_ERR); //disable error interrupts (ORE overrun, FE framing, NE noise)
+//
+//    // delete correctly all UARTS errors
+//    __HAL_UART_CLEAR_FLAG(&huart2,UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF | UART_CLEAR_PEF);
+//
+//    // Clear hardware error flags
+//	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_OREF);
+//	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_FEF);
+//	//__HAL_UART_CLEAR_FLAG(&huart2, UART_CLEAR_NEF);
+//
+//	// Clear RXNE by flushing the data register
+//	__HAL_UART_FLUSH_DRREGISTER(&huart2);
+//
+//
+//	// Reset HAL internal state
+//	huart2.RxXferCount = 0;
+//	huart2.RxXferSize  = 0;
+//	huart2.pRxBuffPtr  = NULL;
+//	huart2.ErrorCode   = HAL_UART_ERROR_NONE;
+//	//onboardLed_red_blink(20);
+//
+//    //huart2.State = HAL_UART_STATE_READY; //return to READY state
+//
+//}
+//
+////wake up serial line after pause
+//void restartUart2(void){
+//	//HAL_Delay(1);
+//	syncObtained = 0; // sync lost
+//
+//	// delete correctly all UARTS errors
+//	__HAL_UART_CLEAR_FLAG(&huart2,UART_CLEAR_FEF | UART_CLEAR_NEF | UART_CLEAR_OREF | UART_CLEAR_PEF);
+//
+//	// Clear RXNE by flushing the data register
+//	__HAL_UART_FLUSH_DRREGISTER(&huart2);
+//
+//
+//	// Reset HAL internal state
+//	huart2.RxXferCount = 0;
+//	huart2.RxXferSize  = 0;
+//	huart2.pRxBuffPtr  = NULL;
+//	huart2.ErrorCode   = HAL_UART_ERROR_NONE;
+//
+//	HAL_UART_Receive_IT(&huart2, &rxBuffer[0], 1);  //restart receiving one byte
+//	last_sent_serial_msg_time=currentTime; //avoid to send message in the same moment when interrupt was restarted
+//}
 
 
 //interrupt called when message is received

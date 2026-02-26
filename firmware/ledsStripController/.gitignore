@@ -14,7 +14,7 @@ SavvyCAN-Windows_x64/
 # temp files
 ~*
 
-# Pliki binarne i raporty kompilacji
+# Binary files and compilation reports
 *.elf
 *.map
 *.hex
@@ -24,3 +24,6 @@ SavvyCAN-Windows_x64/
 *.d
 *.su
 *.cyclo
+
+# Archive bacup files
+*.bak
