@@ -11,11 +11,27 @@
 					//it is in globalVariables.h but better have it here independently
 
 /*
- * @netzmark printf_$ improvement
+ * @netzmark custom-printf improvement
+ * floatToStr() + appendFloatRightAligned()
+*/
+
+/*
  * floatToStr()
- * Converts a float to a null-terminated string with fixed decimal precision.
- * Handles NaN/Inf, applies rounding, and ensures buffer safety.
- * Does NOT perform alignment or field-width formatting.
+ * Converts a floating-point value to a null-terminated ASCII string.
+ *
+ * - Performs manual decimal rounding according to the requested precision
+ * - Suppresses negative zero and very small values (e.g. "-0.00")
+ * - Outputs a fixed number of fractional digits
+ * - Handles sign explicitly and writes into a bounded buffer
+ *
+ * Unlike printf():
+ * - Does not perform automatic field width adjustment
+ * - Does not apply padding or alignment rules internally
+ * - Does not support format flags or scientific notation
+ *
+ * Note:
+ * Field width, padding, and alignment are handled externally
+ * (by appendFloatRightAligned()).
  */
 
 void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
@@ -26,33 +42,30 @@ void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
     char* ptr = str;
     char* end = str + maxLen - 1;   // // reserve space for null terminator ('\0')
 
-    // --- NaN ---
-    if (isnan(num)) {
-        if (ptr < end) *ptr++ = 'n';
-        if (ptr < end) *ptr++ = 'a';
-        if (ptr < end) *ptr++ = 'n';
-        *ptr = '\0';
-        return;
-    }
-
-    // --- Inf ---
-    if (isinf(num)) {
-        if (num < 0 && ptr < end)
-            *ptr++ = '-';
-
-        if (ptr < end) *ptr++ = 'i';
-        if (ptr < end) *ptr++ = 'n';
-        if (ptr < end) *ptr++ = 'f';
-        *ptr = '\0';
-        return;
-    }
-
     // --- Rounding ---
     float rounding = 0.5f;
     for (uint8_t i = 0; i < precision; i++)
         rounding /= 10.0f;
 
     num += (num < 0) ? -rounding : rounding;
+    
+    // --- Remove negative zero & tiny values ---
+    // (so also removes impressions like -0.00)
+    float epsilon = 0.5f;
+	for (uint8_t i = 0; i < precision + 1; i++)
+	    epsilon /= 10.0f;
+
+	if (num > -epsilon && num < epsilon)
+	    num = 0.0f;
+
+//    // --- Remove negative zero (all precision values) ---
+//	if (num == 0.0f) {
+//    	union {
+//    		float f;
+//    	    uint32_t u;
+//    	} v;
+//        v.f = num;
+//	}
 
     // --- Sign ---
     if (num < 0) {
@@ -91,12 +104,14 @@ void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
     *ptr = '\0';
 }
 
+
 /*
  * appendFloatRightAligned()
- * Appends a float to the output buffer as a fixed-width, right-aligned field.
- * Inserts spaces for invalid values (NaN/Inf) and '#' on overflow.
- * Responsible for field width, padding, and visual layout.
+ * Appends a float value into a transport buffer as a fixed-length field.
+ * Total field length is predictable, matching the original Gaucho's intent (I guess).
+ * Handles field width, left padding, right alignment, and visual layout.
  */
+
 void appendFloatRightAligned(char* result,
                              uint8_t* index,
                              uint8_t resultMaxLen,
@@ -104,38 +119,103 @@ void appendFloatRightAligned(char* result,
                              uint8_t precision,
                              uint8_t fieldWidth)
 {
-    // 1️. Invalid data → empty field
+    /* Must always write exactly `fieldWidth` bytes
+       to preserve fixed-length transport frames. */
+
+    if (*index >= resultMaxLen)
+        return;
+
+    /* Invalid float → fill entire field */
     if (isnan(value) || isinf(value))
     {
-        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
-            result[(*index)++] = '-';		//or ' ' if better looking
+        for (uint8_t i = 0; i < fieldWidth && *index < resultMaxLen; i++)
+            result[(*index)++] = '_';   // or ' ' if visually preferred
         return;
     }
 
-    // 2️. Convert number safely
     char buf[32];
     floatToStr(buf, value, precision, sizeof(buf));
 
     uint8_t len = strlen(buf);
 
-    // 3️. Overflow protection
+    /* Overflow → mark entire field */
     if (len > fieldWidth)
     {
-        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
+        for (uint8_t i = 0; i < fieldWidth && *index < resultMaxLen; i++)
             result[(*index)++] = '#';
         return;
     }
 
-    // 4️. Left padding
     uint8_t pad = fieldWidth - len;
 
-    for (uint8_t k = 0; k < pad && *index < resultMaxLen; k++)
+    /* Left padding (right alignment) */
+    for (uint8_t i = 0; i < pad && *index < resultMaxLen; i++)
         result[(*index)++] = ' ';
 
-    // 5️. Copy value
-    for (uint8_t k = 0; k < len && *index < resultMaxLen; k++)
-        result[(*index)++] = buf[k];
+    /* Write value */
+    for (uint8_t i = 0; i < len && *index < resultMaxLen; i++)
+        result[(*index)++] = buf[i];
+
+    /* Safety guard: ensure exact fieldWidth bytes written */
+    for (uint8_t written = pad + len;
+         written < fieldWidth && *index < resultMaxLen;
+         written++)
+    {
+        result[(*index)++] = ' ';
+    }
 }
+
+
+
+///*
+// * appendFloatRightAligned()
+// * Appends a float value into a transport buffer as a variable-length field.
+// * The length of the field depends on the value (the total length can be shorter)
+// * 	because the resulting shorter total length could cause instability,
+// *	therefore this block has been replaced by the one defined above being closer
+// *	to original code idea.
+// * Handles field width, left padding, right alignment, and visual layout.
+// */
+
+//void appendFloatRightAligned(char* result,
+//                             uint8_t* index,
+//                             uint8_t resultMaxLen,
+//                             float value,
+//                             uint8_t precision,
+//                             uint8_t fieldWidth)
+//{
+//    // 1️. Invalid data → empty field
+//    if (isnan(value) || isinf(value))
+//    {
+//        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
+//            result[(*index)++] = '-';		//or ' ' if better looking
+//        return;
+//    }
+//
+//    // 2️. Convert number safely
+//    char buf[32];
+//    floatToStr(buf, value, precision, sizeof(buf));
+//
+//    uint8_t len = strlen(buf);
+//
+//    // 3️. Overflow protection
+//    if (len > fieldWidth)
+//    {
+//        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
+//            result[(*index)++] = '#';
+//        return;
+//    }
+//
+//    // 4️. Left padding
+//    uint8_t pad = fieldWidth - len;
+//
+//    for (uint8_t k = 0; k < pad && *index < resultMaxLen; k++)
+//        result[(*index)++] = ' ';
+//
+//    // 5️. Copy value
+//    for (uint8_t k = 0; k < len && *index < resultMaxLen; k++)
+//        result[(*index)++] = buf[k];
+//}
 /* Section added by @netzmark - END*/
 
 
