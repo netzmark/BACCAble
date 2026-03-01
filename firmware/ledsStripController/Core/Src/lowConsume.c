@@ -84,7 +84,9 @@
 			if(currentTime-lastReceivedCanMsgTime>TIMING__C1____CAN_INACTIVITY_TIMEOUT_BEFORE_SLEEP_MS){
 				if(usbConnectedToSlave==0){
 					lowConsumeIsActive=1;
+
 					pauseUart2(); //stop serial line between chips
+
 					reduceConsumption();
 				}
 			}
@@ -92,14 +94,12 @@
 	}
 
 	void reduceConsumption(void){
-		if(lowConsumeIsActive==0){
-			CAN_LOW_CONSUME_On(); //reduce consumption of other can transceivers (set then as only RX)
-
-			Reset_Other_Chips(); //reduce consumption of other chips (left under reset)
-			front_brake_forced=0;//ensure we disabled relative functions status in master baccable
-			DynoModeEnabledOnMaster=0;//ensure we disabled dyno status on master baccable too
-			onboardLed_blue_on();
-		}
+		CAN_LOW_CONSUME_On(); //reduce consumption of other can transceivers (set then as only RX)
+		Reset_Other_Chips(); //reduce consumption of other chips (left under reset)
+		front_brake_forced=0;//ensure we disabled relative functions status in master baccable
+		DynoModeEnabledOnMaster=0;//ensure we disabled dyno status on master baccable too
+		onboardLed_blue_on();
+		//if(lowConsumeIsActive==1) onboardLed_red_on();
 	}
 
 	void wakeUpAllProcessorsAndTransceivers(void){
