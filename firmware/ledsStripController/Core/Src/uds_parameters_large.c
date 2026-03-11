@@ -19,10 +19,10 @@
 	uint8_t params_setup_dashboardPageIndex=0;
 	uint8_t total_pages_in_params_setup_dashboard_menu=0;
 
-	uint8_t total_pages_in_dashboard_menu_gasoline=41;
+	uint8_t total_pages_in_dashboard_menu_gasoline=48;
 	uint8_t total_pages_in_dashboard_menu_diesel=56;
 	uint8_t currentParamElementSelection=0;
-	
+
 
 	    // Costruzione della stringa
 	    //buildLineWithFormat(template, power, torque, result);
@@ -67,39 +67,56 @@
 	const	uds_params_couple_element uds_params_array[2][60]={
 				{ 	//Gasoline
 					{.name="Power: $3.1fHp, $3.0fNm",					.udsParamId={1,		2		}}, //param couple: PWR and Torque
-					{.name="Oil: $1.1fbar, Water: $3.0f""\xB0""C",		.udsParamId={0,		42		}}, //param couple: OIL pressure and Water Temp.
 					{.name="Oil: $3.0f""\xB0""C, Water: $3.0f""\xB0""C",.udsParamId={5,		42		}}, //param couple: OIL temp. and Water Temp.
 					{.name="Oil: $1.2fbar, $3.0f""\xB0""C",				.udsParamId={0,		5		}}, //param couple: OIL pressure and Oil Temp.
-					{.name="Oil: $1.2fL, Quality: $3.0f%",				.udsParamId={28,	31		}}, //2.2 param couple: OIL level and Oil Quality
-					{.name="Battery: $3.0f%, $3.1fA",					.udsParamId={3,		4		}}, //param couple: BAT State Of Charge and current
-					{.name="Battery: $4.1fV, $3.1fA",					.udsParamId={35,	4		}}, //param couple: BAT voltage and current
-					{.name="Battery: $2.1fV, SoC: $3.0f%",				.udsParamId={35,	3		}}, //NEW param couple: BAT voltage and State Of Charge
-					{.name="IC In/Out temp: $3.0f/$3.0f""\xB0""C",		.udsParamId={23,	22		}}, //NEW param couple: Intercooler input/output  air temperature
+					{.name="Oil: $1.2fL, Quality: $3.0f%",				.udsParamId={28,	31		}}, //param couple: OIL quantity(L) and Oil Quality
+					{.name="Oil: $2.0fmm, Quality: $3.0f%",				.udsParamId={89,	31		}}, //param couple: OIL level(mm) and Oil Quality
+					{.name="Oil: $1.2fL, Level: $2.0fmm",				.udsParamId={28,	89		}}, //param couple: OIL quantity(L) and Oil level(mm)
+					{.name="Battery: $3.0f%, $4.1fA",					.udsParamId={3,		4		}}, //param couple: BAT State Of Charge and current
+					{.name="Battery: $2.1fV, $4.1fA",					.udsParamId={35,	4		}}, //param couple: BAT voltage and current
+					{.name="Battery: $2.1fV, SoC: $3.0f%",				.udsParamId={35,	3		}}, // @netzmark: param couple: BAT voltage and State Of Charge
+					{.name="IC In/Out: $3.0f/$3.0f""\xB0""C",			.udsParamId={23,	22		}}, // @netzmark: param couple: Intercooler input/output  air temperature
+					{.name="Misfires C4: $2.0f [Total:$3.0f]",			.udsParamId={21,	17		}}, // @netzmark: Misfire cyl4 + Total C1-C4 (gasoline)
+					{.name="Misfires C3: $2.0f [Total:$3.0f]",			.udsParamId={20,	17		}}, // @netzmark: Misfire cyl3 + Total C1-C4 (gasoline)
+					{.name="Misfires C2: $2.0f [Total:$3.0f]",			.udsParamId={19,	17		}}, // @netzmark: Misfire cyl2 + Total C1-C4 (gasoline)
+					{.name="Misfires C1: $2.0f [Total:$3.0f]",			.udsParamId={18,	17		}}, // @netzmark: Misfire cyl1 + Total C1-C4 (gasoline)
+					{.name="Misfires total: $3.0f",						.udsParamId={17,	17		}}, // @netzmark: Total misfire C1-C4 (gasoline)
 					{.name="Engine power: $3.1fHp",						.udsParamId={1,		1		}}, //Power
 					{.name="Engine torque: $3.0fNm",					.udsParamId={2,		2		}}, //Torque
-					{.name="IC In temperature: $3.0f""\xB0""C",			.udsParamId={23,	23		}}, //1.1 Intercooler input  air temperature
-					{.name="IC Out temperature: $3.0f""\xB0""C",		.udsParamId={22,	22		}}, //1.1 Intercooler output air temperature
+					{.name="Battery SoC: $3.0f%",						.udsParamId={34,	34		}}, //Battery State Of Charge
+					{.name="Battery current: $4.1fA",					.udsParamId={4,		4		}}, //Battery Current
+					{.name="Battery voltage: $2.1fV",					.udsParamId={35,	35		}}, //Battery Voltage
+					{.name="Turbo sensor volt.: $2.2fV",				.udsParamId={26,	26		}}, //Turbo Sensor Voltage
+					{.name="Catalyst temperature: $3.0f""\xB0""C",		.udsParamId={41,	41		}}, //catalytic converter temperature sensor
+					{.name="Exhaust gas temp.: $3.0f""\xB0""C",			.udsParamId={40,	40		}}, //Exaust gas temperature
+					{.name="IC In temperature: $3.0f""\xB0""C",			.udsParamId={23,	23		}}, //Intercooler input  air temperature
+					{.name="IC Out temperature: $3.0f""\xB0""C",		.udsParamId={22,	22		}}, //Intercooler output air temperature
+					{.name="M/A oil temperature: $3.0f""\xB0""C",		.udsParamId={32,	32		}}, //Multiair Module Oil Temperature
+					{.name="Gearbox temperature: $3.0f""\xB0""C",		.udsParamId={33,	33		}}, //Gearbox Temperature
+					{.name="Water temperature: $3.0f""\xB0""C",			.udsParamId={42,	42		}}, //water temperature
+					{.name="Oil temperature: $3.0f""\xB0""C",			.udsParamId={30,	30		}}, //Oil Temperature
+					{.name="Oil quantity: $1.2fL",						.udsParamId={28,	28		}}, //Oil Quantity
+					{.name="Oil level: $2.1fmm",						.udsParamId={89,	89		}}, // @netzmark: Oil level
+					{.name="Oil quality: $3.0f%",						.udsParamId={31,	31		}}, //Oil Quality
+					{.name="Oil pressure: $1.2fbar",					.udsParamId={29,	29		}}, //Oil Pressure
+					{.name="A/C pressure: $2.2fbar",					.udsParamId={36,	36		}}, //Air Conditioner Pressure
+					{.name="RAIL pressure: $4.0fbar",					.udsParamId={83,	83		}}, //NEW: Rail pressure
 					{.name="Boost pressure: $2.1fbar",					.udsParamId={25,	25		}}, //Boost Pressure calculated from Absolute pressure
 					{.name="Boost abs. press: $2.1fbar",				.udsParamId={24,	24		}}, //Boost Absolute Pressure
-					{.name="Turbo sensor volt.: $2.2fV",				.udsParamId={26,	26		}}, //Turbo Sensor Voltage
-					{.name="Last programmed: $6.0fkm",					.udsParamId={27,	27		}}, //distance since last time odometer was zeroized
-					{.name="Oil quantity: $1.2fL",						.udsParamId={28,	28		}}, //2.2 Oil Quantity
-					{.name="Oil pressure: $1.2fbar",					.udsParamId={29,	29		}}, //2.2 Oil Pressure
-					{.name="Oil temperature: $3.0f""\xB0""C",			.udsParamId={30,	30		}}, //Oil Temperature
-					{.name="Oil quality: $3.0f%",						.udsParamId={31,	31		}}, //Oil Quality
-					{.name="M/A oil temperature: $3.0f""\xB0""C",		.udsParamId={32,	32		}}, //1.1 Multiair Module Oil Temperature
-					{.name="Gearbox temperature: $3.0f""\xB0""C",		.udsParamId={33,	33		}}, //1.1 Gearbox Temperature
-					{.name="Battery SoC: $3.0f%",						.udsParamId={34,	34		}}, //Battery State Of Charge
-					{.name="Battery current: $3.1fA",					.udsParamId={4,		4		}}, //Battery Current
-					{.name="Battery voltage: $2.1fV",					.udsParamId={35,	35		}}, //Battery Voltage
-					{.name="A/C pressure: $2.2fbar",					.udsParamId={36,	36		}}, //2.2 Air Conditioner Pressure
+					{.name="Actual speed: $3.0fkm/h",					.udsParamId={7,		7		}}, //Speed
+					{.name="0-100km/h: $2.2fs",							.udsParamId={9,		9		}}, //0-100km/h time statistic
+					{.name="100-200km/h: $2.2fs",						.udsParamId={10,	10		}}, //100-200km/h time statistic
+					{.name="Best 0-100km/h: $2.2fs",					.udsParamId={11,	11		}}, //0-100km/h Best time statistic
+					{.name="Best 100-200km/h: $2.2fs",					.udsParamId={12,	12		}}, //100-200km/h Best time statistic
+					{.name="GPF clogging: $3.0f%",						.udsParamId={55,	55		}}, //NEW: DPF clogging percentage
 					{.name="Actual gear: $enum",						.udsParamId={6,		6		}}, //Current Gear
-					{.name="Engine time ON: $6.1fm",					.udsParamId={37,	37		}}, //Time Since engine on
-					{.name="Exh. gas temperature: $3.0f""\xB0""C",		.udsParamId={40,	40		}}, //2.1 Exaust gas temperature
-					{.name="Catalyst temperature: $3.0f""\xB0""C",		.udsParamId={41,	41		}}, //2.1 catalytic converter temperature sensor
-					{.name="Water temperature: $3.0f""\xB0""C",			.udsParamId={42,	42		}}, //water temperature
-//					{.name="OVER RPM: $3.1fsec",					.udsParamId={38,	38		}}, //elapsed time in engine overspeed condition
-//					{.name="OVER RPM: $6.0f",						.udsParamId={39,	39		}}, //number of times of engine overspeed condition
+					{.name="Seatbelt alarm: $enum",						.udsParamId={13,	13		}}, //SeatBelt Alarm
+					{.name="Engine time ON: $6.0fm",					.udsParamId={37,	37		}}, //Time Since engine on
+					{.name="Last programmed: $6.0fkm",					.udsParamId={27,	27		}}, //distance since last time odometer was zeroized
+					{.name="RAM: $5.0fB",								.udsParamId={16,	16		}}, //Free RAM
+//					{.name="Oil: $1.1fbar, Water: $3.0f""\xB0""C",		.udsParamId={0,		42		}}, //param couple: OIL pressure and Water Temp.
+//					{.name="OVER RPM: $3.1fsec",						.udsParamId={38,	38		}}, //elapsed time in engine overspeed condition
+//					{.name="OVER RPM: $6.0f",							.udsParamId={39,	39		}}, //number of times of engine overspeed condition
 //					{.name="Knock sensore voltage: $4.3fmV",			.udsParamId={43,	43		}}, //head knock sensor voltage
 //					{.name="Key ID: $4.0f",								.udsParamId={44,	44		}}, //inserted Key ID
 //					{.name="1. Spark advance $1.2fdeg",					.udsParamId={45,	45		}}, //Cylinder correction
@@ -107,15 +124,8 @@
 //					{.name="3. Spark advance $1.2fdeg",					.udsParamId={47,	47		}}, //Cylinder correction
 //					{.name="4. Spark advance $1.2fdeg",					.udsParamId={48,	48		}}, //Cylinder correction
 //					{.name="Drive style: $enum",						.udsParamId={15,	15		}}, //Drive Style
-					{.name="Actual speed: $3.0fkm/h",					.udsParamId={7,		7		}}, //Speed
-					{.name="Seatbelt alarm: $enum",						.udsParamId={13,	13		}}, //SeatBelt Alarm
-					{.name="0-100km/h: $2.2fs",							.udsParamId={9,		9		}}, //0-100km/h time statistic
-					{.name="100-200km/h: $2.2fs",						.udsParamId={10,	10		}}, //100-200km/h time statistic
-					{.name="Best 0-100km/h: $2.2fs",					.udsParamId={11,	11		}}, //0-100km/h Best time statistic
-					{.name="Best 100-200km/h: $2.2fs",					.udsParamId={12,	12		}}, //100-200km/h Best time statistic
-					{.name="GPF clogging: $3.0f%",						.udsParamId={55,	55		}}, //NEW: DPF clogging percentage
-					{.name="RAIL pressure: $4.2fbar",					.udsParamId={83,	83		}}, //NEW: Rail pressure
-					{.name="RAM: $5.0fB",								.udsParamId={16,	16		}}, //Free RAM
+
+
 //									{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B3),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
 //									{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'R', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022230B4),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
 //									{.name={'T', 'Y', 'R', 'E', ' ', 'L', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B2),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
@@ -197,7 +207,7 @@
 				}
 	};
 
-	
+
 	const	uds_param_single_element single_uds_params_array[100]={
 		{.reqId=0x10,		.reqLen=4,  .reqData=SWAP_UINT32(0x00000000),	.replyId=0x000004B2,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,  	.replyScale=0.1,			.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'b','a','r',}					}, //0		oil pressure
 		{.reqId=0x11,	    .reqLen=4,	.reqData=SWAP_UINT32(0x00000000),   .replyId=0x000000FB,	.replyLen=2,	.replyOffset=0,	.replyValOffset=-500,	.replyScale=0.000142378,	.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'C','V',}						}, //1		power
@@ -217,11 +227,11 @@
 		{.reqId=0x1F,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'s', }							}, //14		debug string
 		{.reqId=0x20,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={' ', }							}, //15		Drive Style
 		{.reqId=0x21,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //16		Free RAM		{																																																																						}, //16
-		{																																																																						}, //17
-		{																																																																						}, //18
-		{																																																																						}, //19
-		{																																																																						}, //20
-		{																																																																						}, //21
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222805),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //17		@netzmark: Total misfire
+		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03222801),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //18		@netzmark: Cyl 1 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222802),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //19		@netzmark: Cyl 2 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222803),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //20		@netzmark: Cyl 3 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222804),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //21		@netzmark: Cyl 4 misfire																																																																				}, //21
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221935),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}						}, //22		intercooler air out (gasoline)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03223A58),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}						}, //23		intercooler air in (gasoline)
 		{.reqId=0x18DA10F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322195A),   .replyId=0x18DAF110,    .replyLen=2,    .replyOffset=0, .replyValOffset=-1,     .replyScale=0.001,          .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={'B','A','R'}						}, //24		boost absolute pressure (gasoline)
@@ -289,7 +299,8 @@
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x0322192F),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=0.01,			.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'b','a','r',}					}, //86		Air Conditioner pressure (diesel)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221942),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0.0000394789,	.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'L','/','h',}					}, //87		Fuel consume (diesel)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x0322193F),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0.02,			.replyScaleOffset=-40,	.replyDecimalDigits=1,	.replyMeasurementUnit={0xB0,'C',}						}, //88		Debimeter temperature (diesel)
-	
+		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03223A48),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=0.03125,		.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'m','m',}						}, //89		@netzmark: Oil level in mm (gasoline)
+
 	};
 
 	const char* dpfRegenEnumStrings[] = {
