@@ -7,7 +7,9 @@
 
 #include "functions_Common.h"
 #include "debug.h"
-#include <math.h>	//@netzmark for "appendFloat" related to printf improvement
+#include <string.h>	// @netzmark: theoretically required for strlen
+#include <math.h> 	// @netzmark: we can remove math i resign using isnan() and isinf()
+					//@netzmark for "appendFloat" related to printf improvement
 					//it is in globalVariables.h but better have it here independently
 
 /*
@@ -36,49 +38,34 @@
 
 void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
 {
-    if (maxLen == 0)
-        return;
+    if (maxLen == 0) return;
+
+    // Fast lookup for precision 0-3 (max usable for standard float)
+    static const float lsbTable[] = { 1.0f, 0.1f, 0.01f, 0.001f };
+    if (precision > 3) precision = 3; //I assume that never need higher precision
 
     char* ptr = str;
-    char* end = str + maxLen - 1;   // // reserve space for null terminator ('\0')
+    char* end = str + maxLen - 1; // Reserve space for '\0'
 
-    // --- Rounding ---
-    float rounding = 0.5f;
-    for (uint8_t i = 0; i < precision; i++)
-        rounding /= 10.0f;
+    float lsb = lsbTable[precision];
+    float rounding = lsb / 2.0f;
 
-    num += (num < 0) ? -rounding : rounding;
-    
-    // --- Remove negative zero & tiny values ---
-    // (so also removes impressions like -0.00)
-    float epsilon = 0.5f;
-	for (uint8_t i = 0; i < precision + 1; i++)
-	    epsilon /= 10.0f;
-
-	if (num > -epsilon && num < epsilon)
-	    num = 0.0f;
-
-//    // --- Remove negative zero (all precision values) ---
-//	if (num == 0.0f) {
-//    	union {
-//    		float f;
-//    	    uint32_t u;
-//    	} v;
-//        v.f = num;
-//	}
-
-    // --- Sign ---
-    if (num < 0) {
-        if (ptr < end)
-            *ptr++ = '-';
-        num = -num;
+    // --- Sign handling & Zero-clamping ---
+    // Eliminates "-0.0" by checking if value is below displayable threshold
+    if (num < -rounding) {
+        if (ptr < end) *ptr++ = '-';
+        num = -num + rounding;
+    } else if (num < rounding) {
+        num = 0.0f;
+    } else {
+        num += rounding;
     }
 
     uint32_t intPart = (uint32_t)num;
-    float remainder = num - intPart;
+    float remainder = num - (float)intPart;
 
     // --- Integer part ---
-    char temp[12];
+    char temp[11]; //***instead of "char temp[12]" to save the stack RAM memory for about 1 byte, 11 is enough
     int intLen = 0;
 
     do {
@@ -86,18 +73,18 @@ void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
         intPart /= 10;
     } while (intPart && intLen < (int)sizeof(temp));
 
-    while (intLen-- && ptr < end)
-        *ptr++ = temp[intLen];
+    while (intLen > 0 && ptr < end) {
+        *ptr++ = temp[--intLen];
+    }
 
     // --- Fractional part ---
     if (precision > 0 && ptr < end) {
         *ptr++ = '.';
-
         while (precision-- && ptr < end) {
             remainder *= 10.0f;
             int digit = (int)remainder;
-            *ptr++ = digit + '0';
-            remainder -= digit;
+            *ptr++ = (char)(digit + '0');
+            remainder -= (float)digit;
         }
     }
 
@@ -129,11 +116,11 @@ void appendFloatRightAligned(char* result,
     if (isnan(value) || isinf(value))
     {
         for (uint8_t i = 0; i < fieldWidth && *index < resultMaxLen; i++)
-            result[(*index)++] = '_';   // or ' ' if visually preferred
+            result[(*index)++] = ' ';   // or '-' if visually preferred
         return;
     }
 
-    char buf[32];
+    char buf[32]; // ***instead of "char buf[32]" to save the stack RAM memory for about 16 bytes
     floatToStr(buf, value, precision, sizeof(buf));
 
     uint8_t len = strlen(buf);
@@ -166,63 +153,10 @@ void appendFloatRightAligned(char* result,
 }
 
 
-
-///*
-// * appendFloatRightAligned()
-// * Appends a float value into a transport buffer as a variable-length field.
-// * The length of the field depends on the value (the total length can be shorter)
-// * 	because the resulting shorter total length could cause instability,
-// *	therefore this block has been replaced by the one defined above being closer
-// *	to original code idea.
-// * Handles field width, left padding, right alignment, and visual layout.
-// */
-
-//void appendFloatRightAligned(char* result,
-//                             uint8_t* index,
-//                             uint8_t resultMaxLen,
-//                             float value,
-//                             uint8_t precision,
-//                             uint8_t fieldWidth)
-//{
-//    // 1️. Invalid data → empty field
-//    if (isnan(value) || isinf(value))
-//    {
-//        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
-//            result[(*index)++] = '-';		//or ' ' if better looking
-//        return;
-//    }
-//
-//    // 2️. Convert number safely
-//    char buf[32];
-//    floatToStr(buf, value, precision, sizeof(buf));
-//
-//    uint8_t len = strlen(buf);
-//
-//    // 3️. Overflow protection
-//    if (len > fieldWidth)
-//    {
-//        for (uint8_t k = 0; k < fieldWidth && *index < resultMaxLen; k++)
-//            result[(*index)++] = '#';
-//        return;
-//    }
-//
-//    // 4️. Left padding
-//    uint8_t pad = fieldWidth - len;
-//
-//    for (uint8_t k = 0; k < pad && *index < resultMaxLen; k++)
-//        result[(*index)++] = ' ';
-//
-//    // 5️. Copy value
-//    for (uint8_t k = 0; k < len && *index < resultMaxLen; k++)
-//        result[(*index)++] = buf[k];
-//}
-/* Section added by @netzmark - END*/
-
-
 uint8_t calculateCRC(uint8_t* data, uint8_t arraySize) {
 	uint8_t crc = 0xFF;
 	if(arraySize>1){
-		//calculate sae_j1850 CRC-8 of the array (excluded last element, that will be used to store the final CRC
+		//calculate sae_j1850 CRC-8 of the array (excluded last element, that will be used to store the final CRC)
 		for (uint8_t i=0;i<arraySize-1;i++){
 			crc ^= data[i];
 			for (int i = 0; i < 8; ++i){

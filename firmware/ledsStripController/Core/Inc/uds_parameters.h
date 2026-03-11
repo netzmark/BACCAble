@@ -26,13 +26,13 @@
 		uint32_t 	reqData;
 		uint32_t 	replyId;
 		uint8_t		replyLen;
-		uint8_t		replyOffset;
+		uint8_t		replyOffset; //@netzmark: int_8t if need code with negative offsets
 		int32_t		replyValOffset;
 		float		replyScale;
 		int32_t		replyScaleOffset;
 		uint8_t		replyMeasurementUnit[7];
 		uint8_t		replyDecimalDigits;
-	} uds_param_single_element;
+	} uds_param_single_element;	// @netzmark: "__attribute__((packed)) uds_param_single_element" to get better memory allocation for offsets like 1,3,5;
 
 	extern float dashboardParamCouple[2];
 	extern uint8_t shownParamsArray[240];

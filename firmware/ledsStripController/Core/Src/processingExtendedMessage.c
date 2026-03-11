@@ -56,10 +56,11 @@ void processingExtendedMessage(){
 			}
 		} //end of immobilizer section
 
+//	ori code with hardcoded read offset from D4-D7 only, negative offsets are not possible (if needed is some case)
 		if ((rx_msg_header.ExtId==single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyId) && baccableDashboardMenuVisible){ //if we received UDS message with current selected parameter, let's aquire it
 			if(dashboard_menu_indent_level==1 && main_dashboardPageIndex==1){ //if we are in show params menu
 				onboardLed_blue_on();
-				if (rx_msg_header.DLC>=4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen){
+			  if (rx_msg_header.DLC>=4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen){
 					uint8_t numberOfBytesToRead=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen;
 					// Limita il numero di byte a un massimo di 4 per evitare overflow
 					if (numberOfBytesToRead > 4) {
@@ -85,19 +86,107 @@ void processingExtendedMessage(){
 				}
 			}
 		}
-		/*
-		if(seatbeltAlarmDisabled==0xfe){ //if seatbelt status acquisition is in progress
-			if(rx_msg_header.ExtId==0x18DAF160){ //if received message comes from IPC
-				if (rx_msg_header.DLC>=5){ //if at least 5 bytes
-					if(rx_msg_data[1]==0x62){ //if param read reply successful
-						if((rx_msg_data[2]==0x55) && (rx_msg_data[3]==0xA0 )){ //if param. 55A0 (seat belt alarm status)
-							seatbeltAlarmDisabled= !(rx_msg_data[4]); //coherce to boolean and negate
-						}
-					}
-				}
-			}
-		}
-		*/
+
+
+//	//	@netzmark: corrected code for negative offsets and very frames (like the ones having 3 bytes only), not fully tested  - for future requirements
+//	//	@netzmark: requires change "uint8_t replyOffset" to int type in uds_parameters.h
+//		if ((rx_msg_header.ExtId==single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyId) && baccableDashboardMenuVisible){ //if we received UDS message with current selected parameter, let's aquire it
+//			if(dashboard_menu_indent_level==1 && main_dashboardPageIndex==1){ //if we are in show params menu
+//				onboardLed_blue_on();
+//			/* Relaxed DLC check to support short CAN frames (DLC < 8) and prevent rejecting valid UDS responses or broadcasts that end exactly on the data byte.
+//			 * The fix for uds specific nessages receive
+//			 * */
+//				if (rx_msg_header.DLC>=4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset){
+//					uint8_t numberOfBytesToRead=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen;
+//					// Limita il numero di byte a un massimo di 4 per evitare overflow
+//					if (numberOfBytesToRead > 4) {
+//						numberOfBytesToRead = 4;
+//					}
+//					uint32_t tmpVal=0; //take value of received parameter
+//
+//					// Costruisce il valore a partire dai byte ricevuti
+//					for (int i = 0; i < numberOfBytesToRead; i++) {
+//						// @netzmark: This cast to (int) ensures that the STM32 correctly calculates negative offsets, like -1 or -4, preventing the processor from accessing invalid memory addresses and crashing.to serve negative offsets for short frames
+//
+//					    int targetIdx = 4 + (int)single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset + i;
+//					    if (targetIdx >= 0 && targetIdx < (int)rx_msg_header.DLC) {
+//					        tmpVal |= ((uint32_t)rx_msg_data[targetIdx]) << (8 * (numberOfBytesToRead - 1 - i));
+//					    }
+//					}
+//
+//					tmpVal+=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyValOffset;
+//					float tmpVal2 =tmpVal * single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScale;
+//					tmpVal2 +=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScaleOffset;
+//
+//					if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
+//						currentParamElementSelection=0; //single param
+//					}
+//
+//					dashboardParamCouple[currentParamElementSelection]=tmpVal2;//aquire param in a variabile
+//					sendDashboardPageToSlaveBaccable();//send parameters to BH
+//				}
+//			}
+//		}
+
+//	// @netzmark: corrected simplified code for negative offsetsand very frames (like the ones having 3 bytes only), not tested at all tested - for future requirements
+//	//	@netzmark: requires change "uint8_t replyOffset" to int type in uds_parameters.h
+
+//		// 1. Create a pointer to the current parameter definition to simplify access and improve readability
+//		const uds_param_single_element *p = &single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]];
+//
+//		// Check if the received CAN ID matches the expected replyId and the dashboard is visible
+//		if ((rx_msg_header.ExtId == p->replyId) && baccableDashboardMenuVisible) {
+//		    // Ensure we are in the correct menu level and page
+//		    if (dashboard_menu_indent_level == 1 && main_dashboardPageIndex == 1) {
+//		        onboardLed_blue_on();
+//
+//		        /* RELAXED DLC CHECK:
+//		         * Support short CAN frames (DLC < 8) by checking only if the base header (4 + offset) exists.
+//		         * This prevents rejecting valid UDS responses that end exactly on the data byte.
+//		         */
+//		        if (rx_msg_header.DLC >= (4 + (int)p->replyOffset)) {
+//
+//		            uint8_t bytesToRead = (p->replyLen > 4) ? 4 : p->replyLen;
+//		            uint32_t tmpVal = 0;
+//
+//		            // Loop through the bytes defined in replyLen
+//		            for (int i = 0; i < (int)bytesToRead; i++) {
+//
+//		                /* SAFE INDEX CALCULATION:
+//		                 * Use 'int' to allow negative offsets (e.g., -1 to read byte 3).
+//		                 * This fixes the issue where some ECUs send shorter UDS headers.
+//		                 */
+//		                int targetIdx = 4 + (int)p->replyOffset + i;
+//
+//		                /* OUT-OF-BOUNDS PROTECTION:
+//		                 * Only read if the calculated index is within the physically received CAN frame.
+//		                 * This prevents reading "garbage" or zeros from RAM beyond the actual DLC.
+//		                 */
+//		                if (targetIdx >= 0 && targetIdx < (int)rx_msg_header.DLC) {
+//		                    tmpVal |= ((uint32_t)rx_msg_data[targetIdx]) << (8 * (bytesToRead - 1 - i));
+//		                }
+//		            }
+//
+//		            // 2. APPLY OFFSETS AND SCALING
+//		            // Add raw value offset from the table
+//		            tmpVal += p->replyValOffset;
+//
+//		            // Calculate final float value using scale and scale-offset
+//		            float tmpVal2 = (tmpVal * p->replyScale) + p->replyScaleOffset;
+//
+//		            // Logic for single vs double parameter display
+//		            if (uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection] ==
+//		                uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]) {
+//		                currentParamElementSelection = 0;
+//		            }
+//
+//		            // Store the acquired parameter and send to the display slave
+//		            dashboardParamCouple[currentParamElementSelection] = tmpVal2;
+//		            sendDashboardPageToSlaveBaccable();
+//		        }
+//		    }
+//		}
+
 
 		if((seatbeltAlarmDisabled==0x11) || (seatbeltAlarmDisabled==0x21)){ //if write param was sent (seatbelt disabling or enabling in progress)
 			if(rx_msg_header.ExtId==0x18DAF160){ //if received message comes from IPC
@@ -186,7 +275,7 @@ void processingExtendedMessage(){
 				}
 			}
 		}
-	#endif //end define
+	#endif //end define C1
 
 	#if defined(C2baccable)
 		if (rx_msg_header.ExtId==0x18DAF128 && DynoStateMachine!=0xff ){ //if message from ABS ECU and Dyno state machine is in progress
@@ -254,7 +343,6 @@ void processingExtendedMessage(){
 				DynoStateMachineLastUpdateTime=currentTime;//save last time it was updated
 			}
 		}
-	#endif
-
+	#endif  //end define C2
 
 }
