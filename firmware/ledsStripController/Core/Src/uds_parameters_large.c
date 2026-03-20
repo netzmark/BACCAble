@@ -14,10 +14,9 @@
 
 	float dashboardParamCouple[2];
 
-
 	uint8_t shownParamsArray[240];
 	uint8_t params_setup_dashboardPageIndex=0;
-	uint8_t total_pages_in_params_setup_dashboard_menu=0;
+	uint8_t total_pages_in_params_setup_dashboard_menu=0; //check 48
 
 	uint8_t total_pages_in_dashboard_menu_gasoline=48;
 	uint8_t total_pages_in_dashboard_menu_diesel=56;
@@ -64,11 +63,48 @@
 
 	//format string $x.yf for float params where y is decimal part and x is integer part
 	//format string $enum for enumerator values derived from specific enum arrays
+
+	/* @netzmark: to create multi parameters screens
+	 * Now user can use:
+	 * 			- single parameter array, sample declaration {20, 20}
+	 * 			- dual parameters array, sample declaration {20, 25}
+	 * 			- grouped parameters array (3 or 4} using group numbers > 200, sample "normal" declaration i.e. {255, 255}
+	 *
+	 * Warning: only the numbers 201-255 are alowed as the virtual multi identificators in the uds_params_array
+	 * Warning: Left slot rules and illegal combinations are protected in the code:
+	 * 						- if {255, 255} is the only "normal" settings form for the virtual groups
+	 * 						- if {255, 35} means {255, 255}
+	 * 						- if {35, 255} means {35, 35}
+	 * 						- if {255, 254} means {255, 255}
+	*/
+
+	// Global cache for all UDS parameters (0-99)
+	float uds_values_cache[MAX_UDS_PARAMS];
+
+	/* Virtual groups definitions
+	 * virtual groups may contain 3 or 4 parameters, for 1 or two parameters use regular single/couple visualization
+	 * four subadresses must be filled, if only three in use - put the last one as 200 or "UDS_STOP_ID", as shown in the samples below
+	*/
+	const uds_params_group_element uds_params_groups_array[] = {
+	    { 255, {91, 92, 93, 94}},	// Group Misfire C1-C4
+	    { 254, {17, 18, 34, 35}},	// Group 41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS 	(for my IBS debug purposes)
+	    { 253, {17, 18, 3, 34}},	// Group 41A-byte2, 41A-byte3, SoC-native,  SoC-UDS (for my IBS debug purposes)
+	    { 252, {35, 3, 34, 200}},	// Group VBAT-UDS, SoC-native,  SoC-UDS 			(for my IBS debug purposes)
+	    { 251, {30, 42, 23, 22}},	// Group Temp: oil, water, inlet, outlet
+	    { 250, {30, 42, 33, 200}},	// Group Temp: oil, water, gear
+//	    { 202, {30, 42, 23, 200}}, 			// Sample of three parameters screen declaration, 200 means slot is not used
+//	    { 202, {30, 42, 23, UDS_STOP_ID}}, 	// Sample of three parameters screen declaration, UDS_STOP_ID means slot is not used
+//	    { 201, {x,  y, v, z}}, 				// Starting address
+		{ 200, {200, 200, 200, 200}}											// Guard (STOP) (it's programmable ignored so don't use it but don't change also)
+	    //{ UDS_STOP_ID, {UDS_STOP_ID, UDS_STOP_ID, UDS_STOP_ID, UDS_STOP_ID}}	// Guard (STOP) (it's programmable ignored so don't use it but don't change also)
+	};
+	/* @netzmark: END */
+
 	const	uds_params_couple_element uds_params_array[2][60]={
 				{ 	//Gasoline
 					{.name="Power: $3.1fHp, $3.0fNm",					.udsParamId={1,		2		}}, //param couple: PWR and Torque
 					{.name="Oil: $3.0f""\xB0""C, Water: $3.0f""\xB0""C",.udsParamId={5,		42		}}, //param couple: OIL temp. and Water Temp.
-					{.name="Oil: $1.2fbar, $3.0f""\xB0""C",				.udsParamId={0,		5		}}, //param couple: OIL pressure and Oil Temp.
+					{.name="Oil: $1.2fbar, Temp: $3.0f""\xB0""C",		.udsParamId={0,		5		}}, //param couple: OIL pressure and Oil Temp.d
 					{.name="Oil: $1.2fL, Quality: $3.0f%",				.udsParamId={28,	31		}}, //param couple: OIL quantity(L) and Oil Quality
 					{.name="Oil: $2.0fmm, Quality: $3.0f%",				.udsParamId={89,	31		}}, //param couple: OIL level(mm) and Oil Quality
 					{.name="Oil: $1.2fL, Level: $2.0fmm",				.udsParamId={28,	89		}}, //param couple: OIL quantity(L) and Oil level(mm)
@@ -76,13 +112,13 @@
 					{.name="Battery: $2.1fV, $4.1fA",					.udsParamId={35,	4		}}, //param couple: BAT voltage and current
 					{.name="Battery: $2.1fV, SoC: $3.0f%",				.udsParamId={35,	3		}}, // @netzmark: param couple: BAT voltage and State Of Charge
 					{.name="IC In/Out: $3.0f/$3.0f""\xB0""C",			.udsParamId={23,	22		}}, // @netzmark: param couple: Intercooler input/output  air temperature
-					{.name="Misfires C4: $2.0f [Total:$3.0f]",			.udsParamId={21,	17		}}, // @netzmark: Misfire cyl4 + Total C1-C4 (gasoline)
-					{.name="Misfires C3: $2.0f [Total:$3.0f]",			.udsParamId={20,	17		}}, // @netzmark: Misfire cyl3 + Total C1-C4 (gasoline)
-					{.name="Misfires C2: $2.0f [Total:$3.0f]",			.udsParamId={19,	17		}}, // @netzmark: Misfire cyl2 + Total C1-C4 (gasoline)
-					{.name="Misfires C1: $2.0f [Total:$3.0f]",			.udsParamId={18,	17		}}, // @netzmark: Misfire cyl1 + Total C1-C4 (gasoline)
-					{.name="Misfires total: $3.0f",						.udsParamId={17,	17		}}, // @netzmark: Total misfire C1-C4 (gasoline)
-					{.name="Engine power: $3.1fHp",						.udsParamId={1,		1		}}, //Power
-					{.name="Engine torque: $3.0fNm",					.udsParamId={2,		2		}}, //Torque
+					{.name="Misfires total: $3.0f",						.udsParamId={90,	90		}}, // @netzmark: Total misfire C1-C4 (gasoline)
+					{.name="Misfires: $2.0f; $2.0f; $2.0f; $2.0f;",		.udsParamId={255,   255		}}, // @netzmark: Misfires 1+2+3+4
+					{.name="$3.0f, $3.0f, $3.0f%, $2.1fV",				.udsParamId={254,   254		}}, // @netzmark: TO TEST ONLY "41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS"
+					{.name="$3.0f, $3.0f, $3.0f%, $3.0f%",				.udsParamId={253,   253		}}, // @netzmark: TO TEST ONLY "41A-byte2, 41A-byte3, SoC-native, SoC-UDS"
+					{.name="$2.1fV, $3.0f%, $3.0f%",					.udsParamId={252,   252		}}, // @netzmark: TO TEST ONLY "VBAT-UDS, SoC-native, SoC-UDS"
+					{.name="O:$2.0fC W:$2.0fC In:$2.0fC Out:$2.0fC",	.udsParamId={251,   251		}}, // @netzmark: TO TEST ONLY "temperatures: oil, water, inlet, outlet"
+					{.name="Oil:$3.0fC Wat:$3.0fC Gear:$2.0fC",			.udsParamId={250,   250		}}, // @netzmark: TO TEST ONLY "temperatures: oil, water, gear"
 					{.name="Battery SoC: $3.0f%",						.udsParamId={34,	34		}}, //Battery State Of Charge
 					{.name="Battery current: $4.1fA",					.udsParamId={4,		4		}}, //Battery Current
 					{.name="Battery voltage: $2.1fV",					.udsParamId={35,	35		}}, //Battery Voltage
@@ -114,6 +150,8 @@
 					{.name="Engine time ON: $6.0fm",					.udsParamId={37,	37		}}, //Time Since engine on
 					{.name="Last programmed: $6.0fkm",					.udsParamId={27,	27		}}, //distance since last time odometer was zeroized
 					{.name="RAM: $5.0fB",								.udsParamId={16,	16		}}, //Free RAM
+//					{.name="Engine power: $3.1fHp",						.udsParamId={1,		1		}}, //Power
+//					{.name="Engine torque: $3.0fNm",					.udsParamId={2,		2		}}, //Torque
 //					{.name="Oil: $1.1fbar, Water: $3.0f""\xB0""C",		.udsParamId={0,		42		}}, //param couple: OIL pressure and Water Temp.
 //					{.name="OVER RPM: $3.1fsec",						.udsParamId={38,	38		}}, //elapsed time in engine overspeed condition
 //					{.name="OVER RPM: $6.0f",							.udsParamId={39,	39		}}, //number of times of engine overspeed condition
@@ -124,12 +162,10 @@
 //					{.name="3. Spark advance $1.2fdeg",					.udsParamId={47,	47		}}, //Cylinder correction
 //					{.name="4. Spark advance $1.2fdeg",					.udsParamId={48,	48		}}, //Cylinder correction
 //					{.name="Drive style: $enum",						.udsParamId={15,	15		}}, //Drive Style
-
-
-//									{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B3),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
-//									{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'R', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022230B4),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
-//									{.name={'T', 'Y', 'R', 'E', ' ', 'L', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B2),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
-//									{.name={'T', 'Y', 'R', 'E', ' ', 'L', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B1),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
+//					{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B3),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
+//					{.name={'T', 'Y', 'R', 'E', ' ', 'R', 'R', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022230B4),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
+//					{.name={'T', 'Y', 'R', 'E', ' ', 'L', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B2),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
+//					{.name={'T', 'Y', 'R', 'E', ' ', 'L', 'F', ':', ' ',},              .reqId=0x18DAC7F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x022240B1),   .replyId=0x18DAF1C7,    .replyLen=1,    .replyOffset=4, .replyValOffset=-50,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}                        }, // LIMITE BYTE
 // unit grams/km (wrong?)			{.name={'P','A','R','T','I','C','U','L','.', ':',' ',},				.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032218AA),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0,001,			.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'g','/','k','m'}					}, // GRAMMI PER KM
 // just to print stuff for debug:	{.name={'D',},														.reqId=0x1F,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'s', }							}, //debug string
 
@@ -190,7 +226,6 @@
 						{.name="Best 100-200km/h: $2.2fs",					.udsParamId={12,	12		}}, //100-200km/h Best time statistic
 						{.name="Drive style: $enum",						.udsParamId={15,	15		}}, //Drive Style
 						{.name="RAM: $5.0fB",								.udsParamId={16,	16		}}, //Free RAM
-
 //								{.name={'F','-','L',' ','T','I','R','E',':',' ',},					.reqId=0x18DAC7F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032240B1),	.replyId=0x18DAF1C7,	.replyLen=1,	.replyOffset=4, .replyValOffset=-50,	.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={0xB0,'C',}						},
 //								{.name={'F','-','R',' ','T','I','R','E',':',' ',},					.reqId=0x18DAC7F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032240B2),	.replyId=0x18DAF1C7,	.replyLen=1,	.replyOffset=4, .replyValOffset=-50,	.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={0xB0,'C',}						},
 //								{.name={'R','-','L',' ','T','I','R','E',':',' ',},					.reqId=0x18DAC7F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032240B3),	.replyId=0x18DAF1C7,	.replyLen=1,	.replyOffset=4, .replyValOffset=-50,	.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={0xB0,'C',}						},
@@ -203,12 +238,14 @@
 //stuck to 3,18V				{.name={'T','U','R','B','O','5',':',},								.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221936),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=0.0001,			.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'V',}							},
 //may be not received			{.name={'F','U','E','L',':',' ',},									.reqId=0x18DB33F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03220123),	.replyId=0x18DBF133,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=10,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'k','P','a',}					},
 //just to print stuff for debug:{.name={'D',},														.reqId=0x1F,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'s', }							}, //debug string
-
 				}
 	};
 
+	// @netzmark - Automatic calculation of single_uds_params_array size
+	// to memory: if we will increase 100 records so need increase the value in the uds_parameters.h #define MAX_UDS_PARAMS 100
 
-	const	uds_param_single_element single_uds_params_array[100]={
+	//const	uds_param_single_element single_uds_params_array[100]={
+	const	uds_param_single_element single_uds_params_array[MAX_UDS_PARAMS]={
 		{.reqId=0x10,		.reqLen=4,  .reqData=SWAP_UINT32(0x00000000),	.replyId=0x000004B2,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,  	.replyScale=0.1,			.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'b','a','r',}					}, //0		oil pressure
 		{.reqId=0x11,	    .reqLen=4,	.reqData=SWAP_UINT32(0x00000000),   .replyId=0x000000FB,	.replyLen=2,	.replyOffset=0,	.replyValOffset=-500,	.replyScale=0.000142378,	.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'C','V',}						}, //1		power
 		{.reqId=0x12,	    .reqLen=4,	.reqData=SWAP_UINT32(0x00000000),   .replyId=0x000000FB,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=-500,	.replyDecimalDigits=0,	.replyMeasurementUnit={'N','m',}						}, //2		torque
@@ -226,14 +263,14 @@
 		{.reqId=0x1E,		.reqLen=4,	.reqData=SWAP_UINT32(0x032255A0),	.replyId=0x18DAF160,	.replyLen=1,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //13		seat belt alarm
 		{.reqId=0x1F,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'s', }							}, //14		debug string
 		{.reqId=0x20,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={' ', }							}, //15		Drive Style
-		{.reqId=0x21,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //16		Free RAM		{																																																																						}, //16
-		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222805),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //17		@netzmark: Total misfire
-		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03222801),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //18		@netzmark: Cyl 1 misfire
-		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222802),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //19		@netzmark: Cyl 2 misfire
-		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222803),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //20		@netzmark: Cyl 3 misfire
-		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222804),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //21		@netzmark: Cyl 4 misfire																																																																				}, //21
-		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221935),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}						}, //22		intercooler air out (gasoline)
-		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03223A58),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C'}						}, //23		intercooler air in (gasoline)
+		{.reqId=0x21,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //16		Free RAM
+		{.reqId=0x22,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //17		byte2 of 41A
+		{.reqId=0x23,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //18		byte3 of 41A
+		{																																																																						}, //19
+		{																																																																						}, //20
+		{																																																																						}, //21
+		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221935),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C', }						}, //22		intercooler air out (gasoline)
+		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03223A58),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C', }						}, //23		intercooler air in (gasoline)
 		{.reqId=0x18DA10F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322195A),   .replyId=0x18DAF110,    .replyLen=2,    .replyOffset=0, .replyValOffset=-1,     .replyScale=0.001,          .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={'B','A','R'}						}, //24		boost absolute pressure (gasoline)
 		{.reqId=0x18DA10F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322195A),   .replyId=0x18DAF110,    .replyLen=2,    .replyOffset=0, .replyValOffset=-1,     .replyScale=0.001,          .replyScaleOffset=-1,   .replyDecimalDigits=1,  .replyMeasurementUnit={'B','A','R'}						}, //25		boost pressure extracted from absolute pressure (gasoline)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221936),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=0.0001,			.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'V',}							}, //26		turbo (gasoline)
@@ -277,7 +314,7 @@
 		{.reqId=0x18DA10F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322194E),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,  	.replyScale=0.1,			.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'m','m',}						}, //64		oil level [mm in oil pan (50-70mmm)] (diesel)
 		{.reqId=0x18DA01F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322D930),	.replyId=0x18DAF101,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,  	.replyScale=0.00097676774,	.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'L',}							}, //65		adblue level in liters (diesel)
 		{.reqId=0x18DA01F1,	.reqLen=4,  .reqData=SWAP_UINT32(0x0322D97C),	.replyId=0x18DAF101,	.replyLen=1,	.replyOffset=0,	.replyValOffset=0,  	.replyScale=0.390625,		.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'%',}							}, //66		adblue level in % (diesel)
-		{.reqId=0x18DA10F1,  .reqLen=4,  .reqData=SWAP_UINT32(0x03223836),   .replyId=0x18DAF110,    .replyLen=2,    .replyOffset=0, .replyValOffset=0,      .replyScale=0.02,			.replyScaleOffset=-40,	.replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C',}                       }, //67		exhaust gas temperature (turbo input) (diesel)
+		{.reqId=0x18DA10F1, .reqLen=4,  .reqData=SWAP_UINT32(0x03223836),   .replyId=0x18DAF110,    .replyLen=2,    .replyOffset=0, .replyValOffset=0,      .replyScale=0.02,			.replyScaleOffset=-40,	.replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C',}                       }, //67		exhaust gas temperature (turbo input) (diesel)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221003),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0.02,			.replyScaleOffset=-40,	.replyDecimalDigits=1,	.replyMeasurementUnit={0xB0,'C',}						}, //68		water temperature (diesel)
 		{.reqId=0x18DAC7F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032240B1),	.replyId=0x18DAF1C7,	.replyLen=1,	.replyOffset=4, .replyValOffset=-50,	.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={0xB0,'C',}						}, //69		from left tire temperature (not implemented) (diesel)
 		{.reqId=0x18DAC7F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x032240B2),	.replyId=0x18DAF1C7,	.replyLen=1,	.replyOffset=4, .replyValOffset=-50,	.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={0xB0,'C',}						}, //70		front right tire temperature (diesel)
@@ -300,6 +337,11 @@
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221942),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0.0000394789,	.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'L','/','h',}					}, //87		Fuel consume (diesel)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x0322193F),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=0.02,			.replyScaleOffset=-40,	.replyDecimalDigits=1,	.replyMeasurementUnit={0xB0,'C',}						}, //88		Debimeter temperature (diesel)
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03223A48),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=0.03125,		.replyScaleOffset=0,	.replyDecimalDigits=1,	.replyMeasurementUnit={'m','m',}						}, //89		@netzmark: Oil level in mm (gasoline)
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222805),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //90		@netzmark: Total misfire
+		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03222801),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0,	.replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //91		@netzmark: Cyl 1 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222802),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //92		@netzmark: Cyl 2 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222803),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //93		@netzmark: Cyl 3 misfire
+		{.reqId=0x18DA10F1, .reqLen=4,	.reqData=SWAP_UINT32(0x03222804),	.replyId=0x18DAF110,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ',}							}, //94		@netzmark: Cyl 4 misfire
 
 	};
 

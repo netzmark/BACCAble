@@ -23,7 +23,7 @@
 	#define ENGINE_NSC_DE_SOX_REGEN		4
 	#define ENGINE_SCR_HEATUP_STRATEGY	5
 
-	#define UART_BUFFER_SIZE DASHBOARD_MESSAGE_MAX_LENGTH + 1
+	#define UART_BUFFER_SIZE (DASHBOARD_MESSAGE_MAX_LENGTH + 5) // @netzmark: really necessary to get safely the full 28 characters on the large telematic screen
 
 
 
@@ -77,17 +77,12 @@
 		#include "vuMeter.h" //this is used to control led strip through usb pin
 		#include "lowConsume.h"
 		#include "uds_parameters.h"
-		//extern uint32_t lastReceivedCanMsgTime;
 	#endif
-
-
-
 
 
 		//all variables of globalVariables.c shall be repeated here as extern
 		extern const char *FW_VERSION;
 		extern const uint8_t led_light_on_bit;
-
 
 
 	#if defined(C1baccable)
@@ -169,6 +164,9 @@
 		extern uint8_t uds_parameter_request_msg_data[8];
 		extern uint8_t dashboardPageIndex; //to send message index - it changes when you press cruise control buttons
 		extern uint32_t last_sent_uds_parameter_request_Time; //stores last time we send a uds parameter request
+
+		extern uint8_t last_41A_raw_data[8];	// stores entire 41A frame data, @netzmark - to cheat IBS
+		extern volatile uint8_t new_41A_flag;	// info that 41A has been refreshed, @netzmark - to cheat IBS
 
 		extern uint8_t dieselEngineRegenerationMode; //0=None, 1=DPF_REGEN_LO, 2=DPF_REGEN_HI, 3=NSC_DE_NOX_REGEN, 4=NSC_DE_SOX_REGEN, 5=SCR_HEATUP_STRATEGY
 
@@ -346,6 +344,7 @@
 	#if defined(C2baccable) || defined(BHbaccable)
 		extern FATFS fs; //filesystem
 	#endif
+
 
 	//ESC_TC_CUSTOMIZATOR_MASTER)
 	extern uint8_t function_esc_tc_customizator_enabled; //stored in flash

@@ -300,7 +300,6 @@ void processingStandardMessage(){
 				currentGear= rx_msg_data[3] & 0x0F;
 			#endif
 			break;
-
 		case 0x00000412: //se e' il messaggio che contiene la pressione dell'acceleratore (id 412), se é lungo 5 byte, se il valore é >51 (sfrutto le info ottenute sniffando)
 			#if defined(C1baccable)
 				if(function_led_strip_controller_enabled==1){
@@ -313,25 +312,30 @@ void processingStandardMessage(){
 				}
 			#endif
 			break;
+
 		case 0x0000041A:
 			#if defined(C1baccable)
 				if(rx_msg_header.DLC>=6){
 					batteryStateOfCharge= (rx_msg_data[1] & 0b01111111); //set Most Significant Bit to zero
 					batteryCurrent= (rx_msg_data[4] << 4 | (rx_msg_data[5] >> 4));
+
+					//  @netzmark - to cheat IBS
+					memcpy(last_41A_raw_data, rx_msg_data, 8);
+					new_41A_flag = 1;
 				}
 			#endif
 			//battery state of charge is on byte 1 from bit 6 to 0 (Percentage)
 			//battery current (A) is on byte 4 and in byte 5 from bit 7 to bit 4
 			break;
+
 		case 0x00000420:
 			#if defined(C1baccable)
 				if(rx_msg_header.DLC>=6){
 					//batteryStateOfCharge=rx_msg_data[0];
-
 				}
 			#endif
-
 			break;
+
 		case 0x0000046C:
 			#if defined(BHbaccable)
 

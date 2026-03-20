@@ -8,6 +8,38 @@
 #include "debug.h"
 #include "processingMessage0x000002FA.h"
 
+	/* @netzmark to speed-up clicks reaction */
+#if defined(C1baccable)
+
+    extern uint32_t lastDisplayUpdateTime;
+    extern uint16_t dynamicInterval;
+    extern uint8_t group_step;
+
+	void resetDashboardTimers(void) {
+	    // 1. We reserve quiet on Serial after click
+	    lastDisplayUpdateTime = currentTime - 500;
+
+	    // 2. Set default interval to avoid 0 - the same like in C1baccable.c
+	    dynamicInterval = 200;
+
+	    // 3. Set UDS request after 10ms (fluent new page start)
+	    last_sent_uds_parameter_request_Time = currentTime - dynamicInterval;
+
+	    // 4. Clean UDS cache
+	    for(int i = 0; i < MAX_UDS_PARAMS; i++) {
+	        uds_values_cache[i] = NAN;
+	    }
+
+	    // Clean UART to BH data
+	    dashboardParamCouple[0] = NAN;
+	    dashboardParamCouple[1] = NAN;
+
+	    group_step = 0;
+	}
+
+#endif
+    /* @netzmark - end */
+
 void processingMessage0x000002FA(){
 	// Button is pressed on left area of the wheel
 	// These Buttons are detected only if the main panel of the car is on.
@@ -26,11 +58,7 @@ void processingMessage0x000002FA(){
 
 	#if defined(C1baccable)
 
-
-
-
 	  	//function ACC Virtual Pad
-
 		if(function_acc_virtual_pad_enabled==1){
 			switch (rx_msg_data[0]){
 				case 0x12: //CC on
@@ -90,11 +118,13 @@ void processingMessage0x000002FA(){
 			}
 		}
 
+
 		if(cruiseControlDisabled && ACC_Disabled){ //if we are allowed to press buttons, use them in baccable menu
 			switch(rx_msg_data[0]){
 				case 0x18://if cruise control speed reduction button was pressed, user wants to see next page
 					if(wheelPressedButtonID==0x10 && baccableDashboardMenuVisible){ //if button released, use pressed button
 						wheelPressedButtonID=0x18; //avoid to return here
+						resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 						if(commandsMenuEnabled){
 							switch(dashboard_menu_indent_level){
 								case 0: //main menu
@@ -104,33 +134,41 @@ void processingMessage0x000002FA(){
 										if(main_dashboardPageIndex==2) main_dashboardPageIndex++;
 									}
 
-
 									if(function_clear_faults_enabled==0){
 										if(main_dashboardPageIndex==3) main_dashboardPageIndex++;
 									}
 
-									if(function_dyno_mode_master_enabled==0){
+//									if(immobilizerEnabled==0){ 						// @netzmark to skip not needed info, it should be still visible at longClick
+									if(main_dashboardPageIndex==4) main_dashboardPageIndex++;
+//									}
+
+									if(function_dyno_mode_master_enabled==0){	 	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex++;
 									}
 
-									if(function_esc_tc_customizator_enabled==0){
+//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClickk
 										if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
-									}
+//									}
+
 									if(function_front_brake_forcer_master==0){
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex++;
 									}
 
-									if(function_4wd_disabler_enabled==0){
+//									if(function_4wd_disabler_enabled==0){			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex++;
-									}
+//									}
 
-									if(HAS_function_enabled==0){
+//									if(HAS_function_enabled==0){					// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex++;
-									}
+//									}
 
 									if(QV_exhaust_flap_function_enabled==0){
 										if(main_dashboardPageIndex==12) main_dashboardPageIndex++;
 									}
+
+//									// I don't know the variable name but not important here
+										if(main_dashboardPageIndex==13) main_dashboardPageIndex++;
+//									}
 
 									if(main_dashboardPageIndex>=dashboard_main_menu_array_len)  main_dashboardPageIndex=0; // make a rotative menu
 									//onboardLed_blue_on();
@@ -178,6 +216,7 @@ void processingMessage0x000002FA(){
 				case 0x20://if cruise control speed strong reduction button was pressed, user wants to jump 10 pages forward
 						if(wheelPressedButtonID==0x18 && baccableDashboardMenuVisible){ //if button released, use pressed button
 							wheelPressedButtonID=0x20; //avoid to return here
+							resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 							if(commandsMenuEnabled){
 								switch(dashboard_menu_indent_level){
 									case 0: //main menu
@@ -192,9 +231,11 @@ void processingMessage0x000002FA(){
 										if(function_dyno_mode_master_enabled==0){
 											if(main_dashboardPageIndex==5) main_dashboardPageIndex++;
 										}
+
 										if(function_esc_tc_customizator_enabled==0){
 											if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
 										}
+
 										if(function_front_brake_forcer_master==0){
 											if(main_dashboardPageIndex==7) main_dashboardPageIndex++;
 										}
@@ -254,6 +295,7 @@ void processingMessage0x000002FA(){
 				case 0x08: //if cruise control speed increase button was pressed, user wants to see previous page
 					if(wheelPressedButtonID==0x10 && baccableDashboardMenuVisible){ //if button released, use pressed button
 						wheelPressedButtonID=0x08; //avoid to enter again here
+						resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 						if(commandsMenuEnabled){
 							switch(dashboard_menu_indent_level){
 								case 0: //main menu
@@ -261,28 +303,36 @@ void processingMessage0x000002FA(){
 
 									if(main_dashboardPageIndex>=dashboard_main_menu_array_len)  main_dashboardPageIndex=dashboard_main_menu_array_len-1; // make a rotative menu
 
+//									// I don't know this variable name but not important in this case
+									if(main_dashboardPageIndex==13) main_dashboardPageIndex--;
+//									}
+
 									if(QV_exhaust_flap_function_enabled==0){
 										if(main_dashboardPageIndex==12) main_dashboardPageIndex--;
 									}
 
-									if(HAS_function_enabled==0){
+//									if(HAS_function_enabled==0){					// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex--;
-									}
+//									}
 
-
-									if(function_4wd_disabler_enabled==0){
+//									if(function_4wd_disabler_enabled==0){			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex--;
-										}
+//									}
 
 									if(function_front_brake_forcer_master==0){
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex--;
 									}
-									if(function_esc_tc_customizator_enabled==0){
+//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==6) main_dashboardPageIndex--;
-									}
-									if(function_dyno_mode_master_enabled==0){
+//									}
+
+									if(function_dyno_mode_master_enabled==0){		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex--;
 									}
+
+//									if(immobilizerEnabled==0){						// @netzmark to skip not needed info, it should be still visible at longClick
+										if(main_dashboardPageIndex==4) main_dashboardPageIndex--;
+//									}
 
 									if(function_clear_faults_enabled==0){
 										if(main_dashboardPageIndex==3) main_dashboardPageIndex--;
@@ -332,6 +382,7 @@ void processingMessage0x000002FA(){
 				case 0x00: //if cruise control speed strong increase button was pressed, user wants to jump 10 pages before
 						if(wheelPressedButtonID==0x08 && baccableDashboardMenuVisible){
 							wheelPressedButtonID=0x00; //avoid to return here
+							resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 							if(commandsMenuEnabled){
 								switch(dashboard_menu_indent_level){
 									case 0: //main menu
@@ -509,10 +560,22 @@ void processingMessage0x000002FA(){
 										}
 									}
 									break;
+									//* @netzmark change
+//								case 9: //setup menu
+//								case 10: //params setup menu
+//									dashboard_menu_indent_level++;
+//									break;
 								case 9: //setup menu
+								    dashboard_menu_indent_level++;
+								    resetDashboardTimers();
+								    sendSetupDashboardPageToSlaveBaccable();
+								    break;
 								case 10: //params setup menu
-									dashboard_menu_indent_level++;
-									break;
+								    dashboard_menu_indent_level++;
+								    resetDashboardTimers();
+								    sendParamsSetupDashboardPageToSlaveBaccable();
+								    break;
+								    // @netzmark change
 								case 11: //toggle HAS function
 									HAS_buttonPressRequested=5;
 									//inform Slave baccable C2

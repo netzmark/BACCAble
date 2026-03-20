@@ -154,6 +154,9 @@ const char *FW_VERSION=_FW_VERSION;
 	uint8_t dashboardPageIndex=0; //to send message index - it changes when you press cruise control buttons
 	uint32_t last_sent_uds_parameter_request_Time=0; //stores last time we send a uds parameter request
 
+	uint8_t last_41A_raw_data[8]={0};	// stores entire 41A frame data, @netzmark - to cheat IBS
+	volatile uint8_t new_41A_flag=0;	// info that 41A has been refreshed, @netzmark - to cheat IBS
+
 	uint8_t dieselEngineRegenerationMode=0; //0=None, 1=DPF_REGEN_LO, 2=DPF_REGEN_HI, 3=NSC_DE_NOX_REGEN, 4=NSC_DE_SOX_REGEN, 5=SCR_HEATUP_STRATEGY
 
 	//

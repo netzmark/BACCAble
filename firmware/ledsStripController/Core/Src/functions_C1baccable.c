@@ -12,7 +12,24 @@
 	extern uint32_t _estack;   // Top dello stack (fornito dal linker)
 	//uint8_t tmpArr3[2]={C2BusID,C2cmdRaceMaskDefault};
 
+	/* @netzmark: to create multi parameters screens */
+#include "uds_parameters.h"
+	/* @netzmark: END */
+
 #if defined(C1baccable)
+
+	/* @netzmark: to create multi parameters screens */
+#if defined(C1baccable)
+    uint32_t lastDisplayUpdateTime = 0;
+    uint16_t dynamicInterval = 500;
+    uint8_t  group_step = 0;
+    uint8_t  actuallyRequestedUdsId = 0;
+    uint8_t  requestedId = 0;
+    uint8_t  idLeft = 0;
+    uint8_t  idRight = 0;
+#endif
+    /* @netzmark: END */
+
 	void C1baccableInitCheck(){
 		lowConsume_init();
 		immobilizerEnabled = (uint8_t)readFromFlash(1);  //parameter1 stored in ram, so that we can get it. By default Immo is enabled
@@ -57,6 +74,67 @@
 
 	void C1baccablePeriodicCheck(){
 		lowConsume_process();
+
+//		/*  @netzmark - to cheat IBS */
+//		static uint8_t function_ibs_cheat_enabled = 1; //to test the function only
+//		/*  @netzmark - to cheat IBS */
+//		if(function_ibs_cheat_enabled) {
+//
+//			static const uint_8t battery_soc_min = 65;
+//			static const uint_8t battery_soc_forced = 65;
+//			static const uint_8t battery_soc_max = 95;
+//			//static const uint_8t min_speed = 20;
+//
+// //	 enum {battery_soc_min = 65,
+// //		 	 battery_soc_forced = 65,
+// //			 battery_soc_max = 95,
+// //			 min_speed = 20
+// //		     speed_start_cheating = 25, //start cheating
+// //		     speed_stop_cheating = 15   //stop cheating
+// //	 	 };
+// //
+// //	static uint8_t ibs_cheat_active = 0;
+// //	if (currentSpeed_km_h > speed_start_cheating) {
+// //	    ibs_cheat_active = 1;
+// //	} else if (currentSpeed_km_h < speed_stop_cheating) {
+// //	    ibs_cheat_active = 0;
+// //	}
+//
+//			// 1. TRIGGER: If CAN interrupt set the flag, prepare a burst of 3 spoofed frames
+			if (new_41A_flag) {
+			    new_41A_flag = 0; // Reset the flag immediately
+			} //pamietac zeby usunac tą klamrę po odkomentowaniu całej sekcji kod
+// // //	//if (ibs_cheat_active) {
+//			//if (currentSpeed_km_h > min_speed) {
+//			    if (batteryStateOfCharge > battery_soc_min && batteryStateOfCharge < battery_soc_max) {
+//
+//		        // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
+//			    uint8_t forced_soc_data[8];
+//			    memcpy(forced_soc_data, (void*)last_41A_raw_data, 8);
+//
+//			// MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
+//			    forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;	// We set original status bit and put requested battery_soc_forced (65% probably optimal)
+//
+//		        // Prepare the TX Header for the 0x41A frame
+//				CAN_TxHeaderTypeDef tx_header;
+//				tx_header.StdId = 0x41A;
+//				tx_header.IDE   = CAN_ID_STD;
+//				tx_header.RTR   = CAN_RTR_DATA;
+//				tx_header.DLC   = 8; // Standard 8-byte payload
+//				tx_header.TransmitGlobalTime = DISABLE;
+//
+//		     // FIRE: Send a single spoofed frame
+//			can_tx(&tx_header, forced_soc_data);
+// //		// FIRE: Send a serie of spoofed frames
+// //		  for(uint8_t i = 0; i < 3; i++) {
+// //           can_tx(&tx_header, forced_soc_data);
+// //        }
+//				    }
+//				}
+//			}
+//		//}
+//
+//		/*  @netzmark - END */
 
 		if(QV_exhaust_flap_function_enabled){
 				//if engine off, close valves
@@ -303,48 +381,223 @@
 		}
 		//send a parameter request each xx msec if dashboard menu shall be visible
 		//baccableDashboardMenuVisible=1; //force menu always on, just for debug
-		if((currentTime-last_sent_uds_parameter_request_Time>500) && baccableDashboardMenuVisible ){
-			last_sent_uds_parameter_request_Time=currentTime;
+
+		/* ori Gaucho code */
+//		if((currentTime-last_sent_uds_parameter_request_Time>500) && baccableDashboardMenuVisible ){
+//			last_sent_uds_parameter_request_Time=currentTime;
+//
+//
+//			switch(dashboard_menu_indent_level){
+//				case 0: //main menu
+//					sendMainDashboardPageToSlaveBaccable();
+//					break;
+//				case 1:
+//					if(main_dashboardPageIndex==1){ //we are in show params submenu
+//						clearFaultsRequest=0; //ensure we don't perform more tasks simoultaneously
+//						currentParamElementSelection=!currentParamElementSelection;
+//						if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
+//							currentParamElementSelection=0; //single param
+//						}
+//
+//						if(single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId>0xFF){ //if req id is greather than 0xFF it is a standard UDS request.
+//							//request current parameter to ECU
+//							uds_parameter_request_msg_header.ExtId=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId;
+//
+//							memcpy(&uds_parameter_request_msg_data[0],&single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqData,single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen );
+//							uds_parameter_request_msg_header.DLC=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen;
+//							//onboardLed_blue_on();
+//							can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data); //transmit the request
+//						}else{ //<0xff reqId means special value that we use to get particular values
+//							dashboardParamCouple[currentParamElementSelection]=getNativeParam((uint8_t)uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]);//aquire param in a variabile
+//							sendDashboardPageToSlaveBaccable();  //Send params to BH board
+//						}
+//					}
+//
+//					if(main_dashboardPageIndex==9){
+//						sendSetupDashboardPageToSlaveBaccable();
+//					}
+//					if(main_dashboardPageIndex==10){
+//						sendParamsSetupDashboardPageToSlaveBaccable();
+//					}
+//					break;
+//				default:
+//					break; //unexpected
+//			}
+//		}
 
 
-			switch(dashboard_menu_indent_level){
-				case 0: //main menu
-					sendMainDashboardPageToSlaveBaccable();
-					break;
-				case 1:
-					if(main_dashboardPageIndex==1){ //we are in show params submenu
-						clearFaultsRequest=0; //ensure we don't perform more tasks simoultaneously
-						currentParamElementSelection=!currentParamElementSelection;
-						if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
-							currentParamElementSelection=0; //single param
-						}
+	/* @netzmark: to create multi parameters screens */
+		if(baccableDashboardMenuVisible) {
+		    switch(dashboard_menu_indent_level) {
+		        case 0: // Main Menu
+		            if (currentTime - last_sent_uds_parameter_request_Time >= 500) {
+		                last_sent_uds_parameter_request_Time = currentTime;
+		                sendMainDashboardPageToSlaveBaccable();
+		            }
+		            break;
 
-						if(single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId>0xFF){ //if req id is greather than 0xFF it is a standard UDS request.
-							//request current parameter to ECU
-							uds_parameter_request_msg_header.ExtId=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId;
+		        case 1: // Parameters & Rotator Page
+		            if(main_dashboardPageIndex == 1) {
+		            	uint16_t idToRequest = 0xFFFF;
+		                // --- 1. GLOBAL SYNC ---
+		                idLeft  = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[0];
+		                idRight = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[1];
 
-							memcpy(&uds_parameter_request_msg_data[0],&single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqData,single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen );
-							uds_parameter_request_msg_header.DLC=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen;
-							//onboardLed_blue_on();
-							can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data); //transmit the request
-						}else{ //<0xff reqId means special value that we use to get particular values
-							dashboardParamCouple[currentParamElementSelection]=getNativeParam((uint8_t)uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]);//aquire param in a variabile
-							sendDashboardPageToSlaveBaccable();  //Send params to BH board
-						}
-					}
+		                // --- 2. MODE DETERMINATION (Left rules & Safety Hack) ---
+		                if (idLeft >= UDS_STOP_ID) {
+		                    requestedId = idLeft; // Group Mode: Left Rules
+		                } else if (idRight >= UDS_STOP_ID) {
+		                    requestedId = idLeft; // Safety: Right is a Group but Left is not? Force Single Mode for Left.
+		                    idRight = idLeft;     // Optional: Treat as Single Mode (33, 33)
+		                } else {
+		                    // Standard Couple/Single Mode
+		                    requestedId = (idLeft > idRight) ? idLeft : idRight;
+		                }
 
-					if(main_dashboardPageIndex==9){
-						sendSetupDashboardPageToSlaveBaccable();
-					}
-					if(main_dashboardPageIndex==10){
-						sendParamsSetupDashboardPageToSlaveBaccable();
-					}
-					break;
-				default:
-					break; //unexpected
-			}
+		                // Set Interval: 250ms for Groups, 500ms for Couple/Single
+		                //dynamicInterval = (requestedId >= UDS_STOP_ID) ? 250 : 500;
+		                dynamicInterval = 250;
+
+		                // --- 2. DATA BRIDGE SYNC (The Fridge to Display) ---
+		                if (idLeft < MAX_UDS_PARAMS) dashboardParamCouple[0] = uds_values_cache[idLeft];
+		                if (idRight < MAX_UDS_PARAMS) dashboardParamCouple[1] = uds_values_cache[idRight];
+
+		                // --- 3. UDS ROTATOR LOGIC (Turbo Mode) ---
+		                if (currentTime - last_sent_uds_parameter_request_Time >= dynamicInterval) {
+
+		                    idToRequest = 0xFFFF; // Reset target for this turn
+
+		                    if (idLeft >= UDS_STOP_ID) { // --- GROUP MODE (idLeft rules) ---
+		                        for (int g = 0; g < 10; g++) {
+		                        	if (uds_params_groups_array[g].groupId == UDS_STOP_ID) break;
+		                            if (uds_params_groups_array[g].groupId == idLeft) {
+
+		                                // Turbo Loop: Skip Natives and find next UDS
+		                                for (uint8_t i = 0; i < 4; i++) {
+		                                    uint8_t cId = uds_params_groups_array[g].udsParamId[group_step % 4];
+
+		                                    if (cId >= UDS_STOP_ID) { // let's check if it is not our placeholder
+		                                        group_step = 0;
+		                                        break;
+		                                    }
+
+		                                    if (cId < MAX_UDS_PARAMS) {
+		                                        if (single_uds_params_array[cId].reqId <= 0xFF) {
+		                                            // NATIVE: Instant update, move to next slot in same cycle
+		                                            uds_values_cache[cId] = getNativeParam(cId);
+		                                            group_step++;
+		                                        } else {
+		                                            // UDS: Found CAN target
+		                                            idToRequest = (uint16_t)cId;
+		                                            break;
+		                                        }
+		                                    } else {
+		                                        group_step = 0; // Guard/Empty reset
+		                                        break;
+		                                    }
+		                                }
+		                                break;
+		                            }
+		                        }
+		                    } else { // --- COUPLE/SINGLE MODE ---
+		                        currentParamElementSelection = (idLeft == idRight) ? 0 : !currentParamElementSelection;
+		                        uint8_t coupleTarget = (currentParamElementSelection == 0) ? idLeft : idRight;
+
+		                        if (coupleTarget < MAX_UDS_PARAMS) {
+		                            if (single_uds_params_array[coupleTarget].reqId <= 0xFF) {
+		                                // NATIVE: Update and force next check soon
+		                                uds_values_cache[coupleTarget] = getNativeParam(coupleTarget);
+		                                last_sent_uds_parameter_request_Time = currentTime - (dynamicInterval - 50);
+		                            } else {
+		                                idToRequest = (uint16_t)coupleTarget;
+		                            }
+		                        }
+		                    }
+
+		                    // --- 4. EXECUTE CAN REQUEST ---
+		                    if (idToRequest < MAX_UDS_PARAMS) {
+		                        actuallyRequestedUdsId = (uint8_t)idToRequest;
+
+		                        uds_parameter_request_msg_header.ExtId = single_uds_params_array[idToRequest].reqId;
+		                        memcpy(&uds_parameter_request_msg_data, &single_uds_params_array[idToRequest].reqData, single_uds_params_array[idToRequest].reqLen);
+		                        uds_parameter_request_msg_header.DLC = single_uds_params_array[idToRequest].reqLen;
+
+		                        can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data);
+
+		                        last_sent_uds_parameter_request_Time = currentTime;
+		                        if (idLeft >= UDS_STOP_ID) group_step++;
+		                    } else if (idLeft >= UDS_STOP_ID) {
+		                        // Keep the loop alive if only Natives were processed
+		                        last_sent_uds_parameter_request_Time = currentTime;
+		                    }
+		                }
+
+		                // --- 5. DISPLAY REFRESH ---
+		                if (currentTime - lastDisplayUpdateTime >= 500) {
+		                    sendDashboardPageToSlaveBaccable();
+		                    lastDisplayUpdateTime = currentTime;
+		                }
+		            }
+		            break;
+		    }
 		}
+
+		///////////////////////////////////////////////
+//		/*  @netzmark - to cheat IBS */
+//		static const int battery_soc_min = 65;
+//		static const int battery_soc_forced = 65;
+//		static const int battery_soc_max = 95;
+//	    //static const min_speed = 20;
+//	    //&& currentSpeed_km_h > min_speed
+//
+//		static uint32_t last_spoof_burst_time = 0;
+//		static uint8_t spoof_burst_counter = 0;
+//		/* @netzmark: END */
+//
+//		// 1. TRIGGER: If CAN interrupt set the flag, prepare a burst of 3 spoofed frames
+//		if (new_41A_flag) {
+//		    new_41A_flag = 0; // Reset the flag immediately
+//
+//		    // Only spoof if current SoC is in the target range (e.g., 65% to 95%)
+//
+//		    if (batteryStateOfCharge > battery_soc_min && batteryStateOfCharge < battery_soc_max) {
+//		        spoof_burst_counter = 3; // Set counter to 3 shots
+//		    }
+//		}
+//
+//		// 2. EXECUTION: Send one frame every 10ms until the burst is finished
+//		// This non-blocking approach prevents UART/Menu lag
+//		if (spoof_burst_counter > 0) {
+//		    if (currentTime - last_spoof_burst_time >= 10) {
+//		        last_spoof_burst_time = currentTime;
+//
+//		        // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
+//		        uint8_t forced_soc_data[8];
+//		        for(int k = 0; k < 8; k++) {
+//		        	forced_soc_data[k] = last_41A_raw_data[k];
+//		        }
+//
+//		        // MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
+//		        //forced_soc_data[1] = (uint8_t)battery_soc_forced | 0x80; //| 0xC0
+//				forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;	// We set original status bit and put requested battery_soc_forced (65% probably optimal)
+//
+//		        // Prepare the TX Header for the 0x41A frame
+//		        CAN_TxHeaderTypeDef tx_header;
+//		        tx_header.StdId = 0x41A;
+//		        tx_header.IDE   = CAN_ID_STD;
+//		        tx_header.RTR   = CAN_RTR_DATA;
+//		        tx_header.DLC   = 8; // Standard 8-byte payload
+//		        tx_header.TransmitGlobalTime = DISABLE;
+//
+//		        // FIRE: Send a single spoofed frame
+//		        can_tx(&tx_header, forced_soc_data);
+//
+//		        spoof_burst_counter--; // Decrement the remaining shots
+//		    }
+//		}
 	}
+
+	/* @netzmark: END */
 
 	void sendMainDashboardPageToSlaveBaccable(){
 		uint8_t tmpStrLen=0;
@@ -859,23 +1112,66 @@
 
 
 	}
+//		/* Gaucho ori code */
+//	void sendDashboardPageToSlaveBaccable(){
+//		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
+//
+//
+//		char stringToPrint[25];
+//		buildLineWithFormat( uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name ,  dashboardParamCouple, uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId, stringToPrint); //build string to print
+//
+//		uint8_t tmpStrLen=strlen(stringToPrint);
+//		if(tmpStrLen>DASHBOARD_MESSAGE_MAX_LENGTH) tmpStrLen=DASHBOARD_MESSAGE_MAX_LENGTH; //truncate it. no space left
+//		memcpy(&uartTxMsg[1], &stringToPrint,tmpStrLen); //prepare name of parameter
+//
+//		if (tmpStrLen < DASHBOARD_MESSAGE_MAX_LENGTH) { //if required pad with zeros
+//			memset(&uartTxMsg[1+tmpStrLen], ' ', UART_BUFFER_SIZE-(1+tmpStrLen)); //set to zero remaining chars
+//		}
+//		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
+//	}
 
-	void sendDashboardPageToSlaveBaccable(){
-		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
+	/* @netzmark: to create multi parameters screens */
+	void sendDashboardPageToSlaveBaccable() {
+	    // Set header so the Slave (BH) recognizes this as a dashboard string command
+	    uartTxMsg[0] = BhBusIDparamString;
 
+	    // Initialize workspace buffer with zeros to prevent garbage during string construction
+	    char stringToPrint[64] = {0};
 
-		char stringToPrint[25];
-		buildLineWithFormat( uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name ,  dashboardParamCouple, uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId, stringToPrint); //build string to print
+	    // Get pointers for the current dashboard page based on engine type and page index
+	    const char* tpl = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name;
+	    const uint8_t* ids = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId;
 
-		uint8_t tmpStrLen=strlen(stringToPrint);
-		if(tmpStrLen>DASHBOARD_MESSAGE_MAX_LENGTH) tmpStrLen=DASHBOARD_MESSAGE_MAX_LENGTH; //truncate it. no space left
-		memcpy(&uartTxMsg[1], &stringToPrint,tmpStrLen); //prepare name of parameter
+	    // Fill stringToPrint with formatted data (converts UDS IDs to human-readable values)
+	    buildLineWithFormat(tpl, ids, stringToPrint);
 
-		if (tmpStrLen < DASHBOARD_MESSAGE_MAX_LENGTH) { //if required pad with zeros
-			memset(&uartTxMsg[1+tmpStrLen], ' ', UART_BUFFER_SIZE-(1+tmpStrLen)); //set to zero remaining chars
-		}
-		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
+	    // Calculate text length and enforce the physical screen limit (e.g., 30 chars)
+	    uint8_t tmpStrLen = strlen(stringToPrint);
+	    if(tmpStrLen > DASHBOARD_MESSAGE_MAX_LENGTH) {
+	        tmpStrLen = DASHBOARD_MESSAGE_MAX_LENGTH;
+	    }
+
+	    // IMPORTANT: Wipe the UART buffer with NULLs before copying.
+	    // This ensures that even if the Slave's memory is "dirty", it receives clean data.
+	    memset(&uartTxMsg[1], '\0', DASHBOARD_MESSAGE_MAX_LENGTH);
+
+	    // Copy the truncated string into the UART transmit buffer
+	    memcpy(&uartTxMsg[1], stringToPrint, tmpStrLen);
+
+	    // Calculate total packet size: Header(1) + Text(tmpStrLen) + NULL Terminator(1)
+	    // Sending +2 ensures at least one NULL byte follows the text, killing "ü-umlaut" at 28 characters bug.
+	    uint8_t toSend = tmpStrLen + 2;
+
+	    // Final safety check to stay within the physical bounds of the uartTxMsg array
+	    if (toSend > (DASHBOARD_MESSAGE_MAX_LENGTH + 1)) {
+	        toSend = DASHBOARD_MESSAGE_MAX_LENGTH + 1;
+	    }
+
+	    // Push the clean, null-terminated frame to the UART transmission queue
+	    addToUARTSendQueue(uartTxMsg, toSend);
 	}
+
+	/* @netzmark - END */
 
 	float getNativeParam(uint8_t paramId){
 
@@ -930,186 +1226,146 @@
 			case 16://free RAM
 				return getFreeRAM();
 				break;
+			case 17://get byte0 of 41A
+				return (float)last_41A_raw_data[2];		// RAW Byte 2 - @netzmark: IBS behaviour testing reasons
+				break;
+			case 18: //get byte1 of 41A
+				return (float)last_41A_raw_data[3];		// RAW Byte 3 - @netzmark: IBS behaviour testing reasons
+			    break;
 			default:
 				break;
 		}
 		return 0;
 		}
 
-	//buildLineWithFormat composes string to print, starting from template string and float parameters
-	// syntax: $n.yf or $enum
-	// n = 0..6 (integer part), y = 0..3 (decimal)
+	/* @netzmark: void buildLineWithFormat updated to create multi parameters screens */
+	void buildLineWithFormat(const char* template, const uint8_t *paramIds, char *result) {
+	    uint8_t i = 0, which = 0;
+	    uint8_t idLeft = paramIds[0];
+	    uint8_t idRight = paramIds[1];
+	    const uds_params_group_element* activeGroup = NULL;
 
-	void buildLineWithFormat(const char* template, float values[2], const uint8_t paramId[2], char* result) {
-		//onboardLed_red_blink(5);
-	    uint8_t i = 0;   // indice output //by @netzmark "int i = 0" > "uint8_t i = 0"
-	    int which = 0; // 0 = val1, 1 = val2
+	    // 1. GROUP DETECTION (Left Rules)
+	    if (idLeft >= UDS_STOP_ID) {
+	    	for (uint8_t g = 0; g < (255 - UDS_STOP_ID + 1); g++) {
+	            if (uds_params_groups_array[g].groupId == idLeft) {
+	                activeGroup = &uds_params_groups_array[g];
+	                break;
+	            }
+	            if (uds_params_groups_array[g].groupId == UDS_STOP_ID) break;
+	        }
+	    }
 
-	    for (const char* p = template; *p && i < DASHBOARD_MESSAGE_MAX_LENGTH; p++) {
-	        if (*p == '$'){ //special char. it could be a param in the format $x.yf or in the format $enum
-	        	if (*(p+2) == '.'){ //it should be a param in the format $x.yf
-	        		if(*(p+4) == 'f'){
-	        			if ((*(p+1) >= '0' && *(p+1) <= '9')  && (*(p+3) >= '0' && *(p+3) <= '9')) {
-							int n = *(p+1) - '0'; // parte intera max
-							int y = *(p+3) - '0'; // decimali
-							int maxLen = n + (y>0 ? 1 : 0) + y;
+	    for (const char* p = template; *p && i < 63; p++) {
+	        if (*p == '$') {
+	            // --- ID SELECTION ---
+	            uint8_t currentId;
+	            if (activeGroup) {
+	                currentId = activeGroup->udsParamId[which % 4];
+	            } else {
+	                if (which == 0) currentId = idLeft;
+	                else if (which == 1) currentId = (idRight >= UDS_STOP_ID) ? idLeft : idRight;
+	                else currentId = UDS_STOP_ID;
+	            }
 
-							//char buf[maxLen+1]; // buffer dimensionato sul campo //commented by @netzmark together with the further changes related to printf "appendFloat"
+	            // --- DATA FETCHING (Unified Logic) ---
+	            float valToPrint = NAN;
+	            if (currentId < MAX_UDS_PARAMS) {
+	                // Check the request type in the table
+	                if (single_uds_params_array[currentId].reqId <= 0xFF) {
+	                    valToPrint = getNativeParam(currentId); // Local/Native/Passive
+	                } else {
+	                    valToPrint = uds_values_cache[currentId]; // Active UDS (Active Diagnostics)
+	                }
+	            }
 
-							switch(single_uds_params_array[paramId[which]].reqId){
-								case 0x1A: //0-100 stat
-									if(values[which]>20.0){ //missed
-										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
-									}else{
-										if(statistics_0_100_started){
-											for (const char* q=speedStatisticEnumStrings[1]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //GO
-										}else{ //show time
-											//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
-											//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+	            // Fallback for Bridge
+	            if (isnan(valToPrint) && which < 2 && !activeGroup) {
+	                valToPrint = dashboardParamCouple[which];
+	            }
 
-											/* @netzmark printf_$ improvement - BEGIN
-											 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
-											 */
-											appendFloatRightAligned(result,
-											                        &i,
-											                        DASHBOARD_MESSAGE_MAX_LENGTH,
-											                        values[which],
-											                        y,
-											                        maxLen);
-											/* @netzmark section - END */
-										}
-									}
-									break;
-								case 0x1B: //100-200 stat
-									if(values[which]>40.0){ //missed
-										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
-									}else{
-										if(statistics_100_200_started){
-											for (const char* q=speedStatisticEnumStrings[1]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //GO
-										}else{ //show time
-											//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
-											//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+	            // --- A. ENUM/SPECIAL HANDLER ($enum or $m) ---
+	            if (*(p+1) == 'e' || *(p+4) == 'm') {
+	            	uint8_t rId = (currentId < MAX_UDS_PARAMS) ? single_uds_params_array[currentId].reqId : 0;
+	                switch(rId) {
+	                    case 0x17: // Gear
+	                        if (i < 63) result[i++] = ((uint8_t)valToPrint < 11) ? gearArray[(uint8_t)valToPrint] : '-';
+	                        break;
+	                    case 0x1E: // Seatbelt
+	                        {
+	                            const char* sbt = (valToPrint < 0.5f) ? "ON " : "OFF";
+	                            for (const char* q = sbt; *q && i < 63; q++) result[i++] = *q;
+	                        }
+	                        break;
+	                    case 0x20: // DNA Mode
+	                        if(i < 63) {
+	                            switch(currentDNAmode) {
+	                                case 0x00: result[i++]='N'; break;
+	                                case 0x08: result[i++]='D'; break;
+	                                case 0x10: result[i++]='A'; break;
+	                                case 0x30: result[i++]='R'; break;
+	                                default:   result[i++]='?';
+	                            }
+	                        }
+	                        break;
+	                }
+	                which++; p += 4; continue;
+	            }
 
-											/* @netzmark printf_$ improvement - BEGIN
-											 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
-											 */
-											appendFloatRightAligned(result,
-											                        &i,
-											                        DASHBOARD_MESSAGE_MAX_LENGTH,
-											                        values[which],
-											                        y,
-											                        maxLen);
-											/* @netzmark section - END */
-										}
-									}
-									break;
-								case 0x1C: //Best 0-100
-									if(values[which]>20.0){ //missed
-										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
-									}else{
-										//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
-										//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
+	            // --- B. FLOAT & STATS HANDLER ($1.1f) ---
+	            if (*(p+2) == '.') {
+	                int n = *(p+1) - '0';
+	                int y = *(p+3) - '0';
+	                int maxLen = n + (y > 0 ? 1 : 0) + y;
+	                uint8_t rId = (currentId < MAX_UDS_PARAMS) ? single_uds_params_array[currentId].reqId : 0;
 
-										/* @netzmark printf_$ improvement - BEGIN
-										 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
-										 */
-										appendFloatRightAligned(result,
-										                        &i,
-										                        DASHBOARD_MESSAGE_MAX_LENGTH,
-										                        values[which],
-										                        y,
-										                        maxLen);
-										/* @netzmark section - END */
-									}
-									break;
-								case 0x1D: //Best 100-200
-									if(values[which]>40.0){ //missed
-										for (const char* q=speedStatisticEnumStrings[0]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q; //MISSED
-									}else{
-										//floatToStr(buf, values[which], y, maxLen+1);														//by @netzmark for "appendFloat"
-										//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
-
-										/* @netzmark printf_$ improvement - BEGIN
-										 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
-										 */
-										appendFloatRightAligned(result,
-										                        &i,
-										                        DASHBOARD_MESSAGE_MAX_LENGTH,
-										                        values[which],
-										                        y,
-										                        maxLen);
-										/* @netzmark section - END */
-									}
-									break;
-
-								default:
-									//floatToStr(buf, values[which], y, maxLen+1); 														//by @netzmark for "appendFloat"
-									//for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;	//by @netzmark for "appendFloat"
-
-									/* @netzmark printf_$ improvement - BEGIN
-									 * appendFloatRightAligned configured in functions_common.c and functions_Common.h
-									 */
-									appendFloatRightAligned(result,
-									                        &i,
-									                        DASHBOARD_MESSAGE_MAX_LENGTH,
-									                        values[which],
-									                        y,
-									                        maxLen);
-									/* @netzmark section - END */
-							}
-
-
-							which++;
-							p += 4; // salta "n.yf"
-	        			}else { result[i++] = *p; }
-	        		}else { result[i++] = *p; }
-	        	}else if (*(p+4) == 'm'){ //$enum enumerator
-
-	        		switch(single_uds_params_array[paramId[which]].reqId){
-						case 0x17: //if Current gear request data - currentGear
-							if ((uint8_t)values[which]<11){
-								result[i++] = gearArray[(uint8_t)values[which]];
-							}else{
-								result[i++] = '-';
-							}
-							break;
-						case 0x19:
-							if((uint8_t)values[which]>6) values[which]=7;
-							for (const char* q=dpfRegenEnumStrings[(uint8_t)values[which]]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q;
-							break;
-
-						case 0x1E:
-							if((uint8_t)values[which]>1) values[which]=2;
-							for (const char* q=setbeltEnumStrings[(uint8_t)values[which]]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q;
-							break;
-						case 0x20:
-							switch(currentDNAmode){
-								case 0x00: //Natural
-									result[i++]='N';
-									break;
-								case 0x08: //Dynamic
-									result[i++]='D';
-									break;
-								case 0x10: //All Weather
-									result[i++]='A';
-									break;
-								case 0x30: //Race
-									result[i++]='R';
-									break;
-								default:
-									result[i++]='?';
-							}
-							break;
-						default:
-							break;
-	        		}
-	        		which++;
-	        		p += 4; // salta "enum"
-	        	}else { result[i++] = *p; }
-	        }else { result[i++] = *p; }
+	                switch(rId) {
+	                    case 0x1A: // 0-100 stat
+	                        if(valToPrint > 20.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else if(statistics_0_100_started) {
+	                            for (const char* q=speedStatisticEnumStrings[1]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1B: // 100-200 stat
+	                        if(valToPrint > 40.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else if(statistics_100_200_started) {
+	                            for (const char* q=speedStatisticEnumStrings[1]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1C: // Best 0-100
+	                        if(valToPrint > 20.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1D: // Best 100-200
+	                        if(valToPrint > 40.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    default:
+	                        appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        break;
+	                }
+	                which++; p += 4; continue; // @netzmark UCINANIE ZNAKU
+	                //which++; p += 3; continue;
+	            }
+	        }
+	        if (i < 63) result[i++] = *p;
 	    }
 	    result[i] = '\0';
 	}
+
+	/* @netzmark - END */
 
 	uint8_t removePatterns(char *str) {
 	    char *p;
@@ -1230,6 +1486,7 @@
 		  HAS_function_enabled,
 		  QV_exhaust_flap_function_enabled,
 		};
+		  //function_ibs_cheat_enabled //@ @netzmark for IBS cheat future option
 
 		for (uint8_t i = 0; i < paramsNumber; i++) {
 		    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, LAST_PAGE_ADDRESS + (i * 4), params[i]) != HAL_OK) {

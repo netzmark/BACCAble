@@ -7,10 +7,8 @@
 
 #include "functions_Common.h"
 #include "debug.h"
-#include <string.h>	// @netzmark: theoretically required for strlen
-#include <math.h> 	// @netzmark: we can remove math i resign using isnan() and isinf()
-					//@netzmark for "appendFloat" related to printf improvement
-					//it is in globalVariables.h but better have it here independently
+#include <string.h>	// @netzmark: for strlen
+
 
 /*
  * @netzmark custom-printf improvement
@@ -65,7 +63,7 @@ void floatToStr(char* str, float num, uint8_t precision, uint8_t maxLen)
     float remainder = num - (float)intPart;
 
     // --- Integer part ---
-    char temp[11]; //***instead of "char temp[12]" to save the stack RAM memory for about 1 byte, 11 is enough
+    char temp[11];
     int intLen = 0;
 
     do {
@@ -120,9 +118,9 @@ void appendFloatRightAligned(char* result,
         return;
     }
 
-    char buf[32]; // ***instead of "char buf[32]" to save the stack RAM memory for about 16 bytes
+    char buf[16] = {0}; // instead of "char buf[32]
     floatToStr(buf, value, precision, sizeof(buf));
-
+    //buf[15] = '\0';// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     uint8_t len = strlen(buf);
 
     /* Overflow → mark entire field */
