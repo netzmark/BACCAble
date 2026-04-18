@@ -567,12 +567,12 @@ void processingMessage0x000002FA(){
 //									break;
 								case 9: //setup menu
 								    dashboard_menu_indent_level++;
-								    resetDashboardTimers();
+								    resetDashboardTimers(); //@netzmark to speed-up clicks reaction
 								    sendSetupDashboardPageToSlaveBaccable();
 								    break;
 								case 10: //params setup menu
 								    dashboard_menu_indent_level++;
-								    resetDashboardTimers();
+								    resetDashboardTimers(); //@netzmark to speed-up clicks reaction
 								    sendParamsSetupDashboardPageToSlaveBaccable();
 								    break;
 								    // @netzmark change
@@ -764,15 +764,17 @@ void processingMessage0x000002FA(){
 											uint8_t tmpArr5[2]={C2_Bh_BusID,C2_Bh_cmdFunctHAS_Disabled};
 											if(HAS_function_enabled) tmpArr5[1]=C2_Bh_cmdFunctHAS_Enabled;
 											addToUARTSendQueue(tmpArr5, 2);
-
 											break;
 										case 27: //{'O',' ',' ','Q','V',' ','E','x','h','a','u','s','t',' ','F','l','a','p'},
 											QV_exhaust_flap_function_enabled=!QV_exhaust_flap_function_enabled;
 											break;
+//										case 28: //{'O',' ',' ','B','A','T ','','F','u','l','l',' ','C','h','a','r','g','e'},
+//											function_ibs_cheat_enabled=!function_ibs_cheat_enabled; //@netzmark - to cheat IBS
+//											break;
 										default:
 											break;
 									}
-
+									resetDashboardTimers(); //@netzmark to speed-up clicks reaction XX
 									sendSetupDashboardPageToSlaveBaccable();
 									break;
 								case 10: //PARAMS SETUP MENU
@@ -780,15 +782,20 @@ void processingMessage0x000002FA(){
 										case 0: //{'S','A','V','E','&','E','X','I','T',},
 											saveShownParamsOnflash();
 											dashboard_menu_indent_level=0;
+											resetDashboardTimers(); //@netzmark to speed-up clicks reaction XX
+											sendMainDashboardPageToSlaveBaccable(); //@netzmark to speed-up clicks reaction XX
 											break;
 										default: //toggle hidden variable of current param
 											shownParamsArray[params_setup_dashboardPageIndex-1]=!shownParamsArray[params_setup_dashboardPageIndex-1];
+											resetDashboardTimers();  //@netzmark to speed-up clicks reaction XX
+											sendParamsSetupDashboardPageToSlaveBaccable();  //@netzmark to speed-up clicks reaction XX
 											break;
 									}
 									break;
 								default:
 									//we want to return main menu
 									dashboard_menu_indent_level=0;
+									resetDashboardTimers();  //@netzmark to speed-up clicks reaction XX
 									sendMainDashboardPageToSlaveBaccable(); //print menu
 							}
 						}

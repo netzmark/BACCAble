@@ -86,6 +86,14 @@
 
 
 	#if defined(C1baccable)
+//		extern UART_HandleTypeDef huart1; // this is the serial line toward schizzaforte
+		extern uint8_t currentSchizzaforteMap;
+//		extern int8_t pedal_map_power; //pedal map amplification, between -10 and +10
+//		extern uint8_t pedal_map_power_adapted; //adaptation depending on current map
+//		extern uint32_t last_queued_serial_to_schizzaForte_msg_time;
+//		extern uint8_t playMotorJingle; //position of the execution of the jingle. set to 255 to start execution
+//		extern uint8_t jingleArray[255];
+
 		extern float chronometerElapsedTime_0_100_km_h; //stores time statistic in seconds
 		extern float chronometerElapsedTime_100_200_km_h; //stores time statistic in seconds
 		extern uint8_t statistics_0_100_started; //stores id the statistic timer has started

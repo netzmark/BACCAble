@@ -64,6 +64,7 @@
 		function_open_windows_with_door_lock=(uint16_t)readFromFlash(26);
 		HAS_function_enabled=(uint16_t)readFromFlash(27);
 		QV_exhaust_flap_function_enabled=(uint16_t)readFromFlash(28);
+		//function_ibs_cheat_enabled=(uint16_t)readFromFlash(29); //@netzmark - to cheat IBS
 
 		//arise trigger to notify enabled functions to slave boards with dedicated messages,after some seconds
 		allProcessorsWakeupTime=currentTime;
@@ -75,65 +76,64 @@
 	void C1baccablePeriodicCheck(){
 		lowConsume_process();
 
-//		/*  @netzmark - to cheat IBS */
+		/*  @netzmark - to cheat IBS */
+
 //		static uint8_t function_ibs_cheat_enabled = 1; //to test the function only
-//		/*  @netzmark - to cheat IBS */
+//
 //		if(function_ibs_cheat_enabled) {
 //
-//			static const uint_8t battery_soc_min = 65;
-//			static const uint_8t battery_soc_forced = 65;
-//			static const uint_8t battery_soc_max = 95;
-//			//static const uint_8t min_speed = 20;
+//		    enum {
+//		        battery_soc_min      = 50, //75
+//		        battery_soc_forced   = 90, //75
+//		        battery_soc_max      = 98,
+//		        speed_start_cheating = 30,
+//		        speed_stop_cheating  = 25
+//		    };
 //
-// //	 enum {battery_soc_min = 65,
-// //		 	 battery_soc_forced = 65,
-// //			 battery_soc_max = 95,
-// //			 min_speed = 20
-// //		     speed_start_cheating = 25, //start cheating
-// //		     speed_stop_cheating = 15   //stop cheating
-// //	 	 };
-// //
-// //	static uint8_t ibs_cheat_active = 0;
-// //	if (currentSpeed_km_h > speed_start_cheating) {
-// //	    ibs_cheat_active = 1;
-// //	} else if (currentSpeed_km_h < speed_stop_cheating) {
-// //	    ibs_cheat_active = 0;
-// //	}
+////		    static uint8_t ibs_cheat_active = 0;
+////
+////		    // Histeresis logic
+////		    if (currentSpeed_km_h > speed_start_cheating) {
+////		        ibs_cheat_active = 1;
+////		    } else if (currentSpeed_km_h < speed_stop_cheating) {
+////		        ibs_cheat_active = 0;
+////		    }
 //
-//			// 1. TRIGGER: If CAN interrupt set the flag, prepare a burst of 3 spoofed frames
-			if (new_41A_flag) {
-			    new_41A_flag = 0; // Reset the flag immediately
-			} //pamietac zeby usunac tą klamrę po odkomentowaniu całej sekcji kod
-// // //	//if (ibs_cheat_active) {
-//			//if (currentSpeed_km_h > min_speed) {
-//			    if (batteryStateOfCharge > battery_soc_min && batteryStateOfCharge < battery_soc_max) {
+//		    // TRIGGER: If CAN interrupt set the flag, prepare a spoof frame
+//		    if (new_41A_flag) {
+//		        new_41A_flag = 0;
 //
-//		        // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
-//			    uint8_t forced_soc_data[8];
-//			    memcpy(forced_soc_data, (void*)last_41A_raw_data, 8);
+////		        if (ibs_cheat_active &&
+////		            batteryStateOfCharge >= battery_soc_min &&
+////		            batteryStateOfCharge < battery_soc_max) {
 //
-//			// MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
-//			    forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;	// We set original status bit and put requested battery_soc_forced (65% probably optimal)
+//		            // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
+//		            uint8_t forced_soc_data[8];
+//		            memcpy(forced_soc_data, (void*)last_41A_raw_data, 8);
 //
-//		        // Prepare the TX Header for the 0x41A frame
-//				CAN_TxHeaderTypeDef tx_header;
-//				tx_header.StdId = 0x41A;
-//				tx_header.IDE   = CAN_ID_STD;
-//				tx_header.RTR   = CAN_RTR_DATA;
-//				tx_header.DLC   = 8; // Standard 8-byte payload
-//				tx_header.TransmitGlobalTime = DISABLE;
+//		            // MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
+//		            forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;
 //
-//		     // FIRE: Send a single spoofed frame
-//			can_tx(&tx_header, forced_soc_data);
-// //		// FIRE: Send a serie of spoofed frames
-// //		  for(uint8_t i = 0; i < 3; i++) {
-// //           can_tx(&tx_header, forced_soc_data);
-// //        }
-//				    }
-//				}
-//			}
-//		//}
+//		            // Prepare the TX Header for the 0x41A frame
+//		            CAN_TxHeaderTypeDef tx_header;
+//		            tx_header.StdId = 0x41A;
+//		            tx_header.IDE   = CAN_ID_STD;
+//		            tx_header.RTR   = CAN_RTR_DATA;
+//		            tx_header.DLC   = 8;
+//		            tx_header.TransmitGlobalTime = DISABLE;
 //
+//		            onboardLed_red_on(); // for the test only
+//		            // Send a single spoofed frame
+//		            //can_tx(&tx_header, forced_soc_data);
+//
+//		            // or - Send a serie of 3 spoofed frames
+//		            for(uint8_t i = 0; i < 3; i++) {
+//		            	can_tx(&tx_header, forced_soc_data);
+//		            	}
+//		        //}
+//		    }
+//		}
+
 //		/*  @netzmark - END */
 
 		if(QV_exhaust_flap_function_enabled){
@@ -530,71 +530,23 @@
 		                        // Keep the loop alive if only Natives were processed
 		                        last_sent_uds_parameter_request_Time = currentTime;
 		                    }
-		                }
-
-		                // --- 5. DISPLAY REFRESH ---
-		                if (currentTime - lastDisplayUpdateTime >= 500) {
-		                    sendDashboardPageToSlaveBaccable();
-		                    lastDisplayUpdateTime = currentTime;
-		                }
-		            }
+		                } //end of if (currentTime - last_sent_uds_parameter_request_Time >= dynamicInterval)
+		            } // end of if(main_dashboardPageIndex == 1)
 		            break;
+		    } //end of the switch(dashboard_menu_indent_level)
+
+            // --- 5. DISPLAY REFRESH ---
+		    if (currentTime - lastDisplayUpdateTime >= 500) {
+		    	if (dashboard_menu_indent_level > 0) {
+		    		switch (main_dashboardPageIndex) {
+		            	case 1:  sendDashboardPageToSlaveBaccable(); break; 			//parameters screens
+		            	case 9:  sendSetupDashboardPageToSlaveBaccable(); break;		//setup menu
+		            	case 10: sendParamsSetupDashboardPageToSlaveBaccable(); break;	//params setup menu
+		    		}
+		    		lastDisplayUpdateTime = currentTime;
+		    	}
 		    }
 		}
-
-		///////////////////////////////////////////////
-//		/*  @netzmark - to cheat IBS */
-//		static const int battery_soc_min = 65;
-//		static const int battery_soc_forced = 65;
-//		static const int battery_soc_max = 95;
-//	    //static const min_speed = 20;
-//	    //&& currentSpeed_km_h > min_speed
-//
-//		static uint32_t last_spoof_burst_time = 0;
-//		static uint8_t spoof_burst_counter = 0;
-//		/* @netzmark: END */
-//
-//		// 1. TRIGGER: If CAN interrupt set the flag, prepare a burst of 3 spoofed frames
-//		if (new_41A_flag) {
-//		    new_41A_flag = 0; // Reset the flag immediately
-//
-//		    // Only spoof if current SoC is in the target range (e.g., 65% to 95%)
-//
-//		    if (batteryStateOfCharge > battery_soc_min && batteryStateOfCharge < battery_soc_max) {
-//		        spoof_burst_counter = 3; // Set counter to 3 shots
-//		    }
-//		}
-//
-//		// 2. EXECUTION: Send one frame every 10ms until the burst is finished
-//		// This non-blocking approach prevents UART/Menu lag
-//		if (spoof_burst_counter > 0) {
-//		    if (currentTime - last_spoof_burst_time >= 10) {
-//		        last_spoof_burst_time = currentTime;
-//
-//		        // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
-//		        uint8_t forced_soc_data[8];
-//		        for(int k = 0; k < 8; k++) {
-//		        	forced_soc_data[k] = last_41A_raw_data[k];
-//		        }
-//
-//		        // MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
-//		        //forced_soc_data[1] = (uint8_t)battery_soc_forced | 0x80; //| 0xC0
-//				forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;	// We set original status bit and put requested battery_soc_forced (65% probably optimal)
-//
-//		        // Prepare the TX Header for the 0x41A frame
-//		        CAN_TxHeaderTypeDef tx_header;
-//		        tx_header.StdId = 0x41A;
-//		        tx_header.IDE   = CAN_ID_STD;
-//		        tx_header.RTR   = CAN_RTR_DATA;
-//		        tx_header.DLC   = 8; // Standard 8-byte payload
-//		        tx_header.TransmitGlobalTime = DISABLE;
-//
-//		        // FIRE: Send a single spoofed frame
-//		        can_tx(&tx_header, forced_soc_data);
-//
-//		        spoof_burst_counter--; // Decrement the remaining shots
-//		    }
-//		}
 	}
 
 	/* @netzmark: END */
@@ -1226,10 +1178,13 @@
 			case 16://free RAM
 				return getFreeRAM();
 				break;
-			case 17://get byte0 of 41A
+			case 17://Pedal current Map
+				return currentSchizzaforteMap;
+				break;
+			case 18://get byte0 of 41A
 				return (float)last_41A_raw_data[2];		// RAW Byte 2 - @netzmark: IBS behaviour testing reasons
 				break;
-			case 18: //get byte1 of 41A
+			case 19: //get byte1 of 41A
 				return (float)last_41A_raw_data[3];		// RAW Byte 3 - @netzmark: IBS behaviour testing reasons
 			    break;
 			default:

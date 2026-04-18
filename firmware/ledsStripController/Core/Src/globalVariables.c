@@ -21,6 +21,8 @@ const char *FW_VERSION=_FW_VERSION;
 
 
 #if defined(C1baccable)
+	uint8_t currentSchizzaforteMap='-';
+
 	float chronometerElapsedTime_0_100_km_h=60; //stores time statistic in seconds
 	float chronometerElapsedTime_100_200_km_h=60; //stores time statistic in seconds
 	uint8_t statistics_0_100_started=0; //stores id the statistic timer has started

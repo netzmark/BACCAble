@@ -16,7 +16,7 @@
 
 	uint8_t shownParamsArray[240];
 	uint8_t params_setup_dashboardPageIndex=0;
-	uint8_t total_pages_in_params_setup_dashboard_menu=0; //check 48
+	uint8_t total_pages_in_params_setup_dashboard_menu=0;
 
 	uint8_t total_pages_in_dashboard_menu_gasoline=48;
 	uint8_t total_pages_in_dashboard_menu_diesel=56;
@@ -87,8 +87,8 @@
 	*/
 	const uds_params_group_element uds_params_groups_array[] = {
 	    { 255, {91, 92, 93, 94}},	// Group Misfire C1-C4
-	    { 254, {17, 18, 34, 35}},	// Group 41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS 	(for my IBS debug purposes)
-	    { 253, {17, 18, 3, 34}},	// Group 41A-byte2, 41A-byte3, SoC-native,  SoC-UDS (for my IBS debug purposes)
+	    { 254, {18, 19, 34, 35}},	// Group 41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS 	(for my IBS debug purposes)
+	    { 253, {18, 19, 3, 34}},	// Group 41A-byte2, 41A-byte3, SoC-native,  SoC-UDS (for my IBS debug purposes)
 	    { 252, {35, 3, 34, 200}},	// Group VBAT-UDS, SoC-native,  SoC-UDS 			(for my IBS debug purposes)
 	    { 251, {30, 42, 23, 22}},	// Group Temp: oil, water, inlet, outlet
 	    { 250, {30, 42, 33, 200}},	// Group Temp: oil, water, gear
@@ -264,9 +264,9 @@
 		{.reqId=0x1F,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={'s', }							}, //14		debug string
 		{.reqId=0x20,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=2,	.replyMeasurementUnit={' ', }							}, //15		Drive Style
 		{.reqId=0x21,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //16		Free RAM
-		{.reqId=0x22,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //17		byte2 of 41A
-		{.reqId=0x23,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //18		byte3 of 41A
-		{																																																																						}, //19
+		{.reqId=0x22,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={' ', }							}, //17		Selected Pedal Map
+		{.reqId=0x23,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //18		byte2 of 41A
+		{.reqId=0x24,		.reqLen=4,	.reqData=SWAP_UINT32(0x00000000),	.replyId=0x00000000,	.replyLen=2,	.replyOffset=0, .replyValOffset=0,		.replyScale=1,				.replyScaleOffset=0,	.replyDecimalDigits=0,	.replyMeasurementUnit={'B', }							}, //19		byte3 of 41A
 		{																																																																						}, //20
 		{																																																																						}, //21
 		{.reqId=0x18DA10F1,	.reqLen=4,	.reqData=SWAP_UINT32(0x03221935),   .replyId=0x18DAF110,    .replyLen=1,    .replyOffset=0, .replyValOffset=-40,    .replyScale=1,              .replyScaleOffset=0,    .replyDecimalDigits=1,  .replyMeasurementUnit={0xB0,'C', }						}, //22		intercooler air out (gasoline)
