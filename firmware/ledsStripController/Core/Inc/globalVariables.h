@@ -460,4 +460,19 @@
 
 	extern uint8_t usbConnectedToSlave;
 
+	// @netzmark PDC code - begin
+	#if defined(C2baccable)
+		extern volatile uint8_t pdc_state_disabled;
+		extern volatile uint8_t pdc_is_beeping;
+		extern volatile uint8_t pdc_auto_disabled;
+		extern volatile uint8_t requestToTogglePDC;
+		extern volatile uint8_t reverseGearActive;
+		extern uint8_t pdcMsgData[8];
+		extern CAN_TxHeaderTypeDef pdcMsgHeader;
+		extern volatile int pdc_send_counter;
+		extern volatile uint32_t last_pdc_shot_time;
+	#endif
+	// @netzmark PDC code - end
+
+
 #endif /* INC_GLOBALVARIABLES_H_ */

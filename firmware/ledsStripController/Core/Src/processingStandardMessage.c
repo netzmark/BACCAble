@@ -7,6 +7,14 @@
 
 #include "processingStandardMessage.h"
 
+//	//@netzmark PDC DISABLE variables
+//#if defined(C2baccable)
+//	static uint8_t pdc_state_disabled	= 0; // 0 = PDC enabled, 1 = PDC disabled (LED off)
+//	static uint8_t pdc_is_beeping      	= 0; // 1 = sensors in alarms
+//	static uint8_t pdc_auto_disabled   	= 0; // 1 = PDC was disabled with our procedure
+//#endif
+//	//end
+
 void processingStandardMessage(){
 	#if defined(C1baccable)
 		if(function_route_msg_enabled==1){
@@ -194,7 +202,6 @@ void processingStandardMessage(){
 			//clutch upstop is on byte0 bit 6
 			//actual pedal position is on byte0 from bit 4 to 0 and byte 1 from bit7 to 5
 			//analog cluch is on byte 1 from bit 4 to 0 and byte 2 from bit 7 to 5.
-
 			break;
 		case 0x0000001F7:
 			#if defined(C1baccable)
@@ -297,7 +304,15 @@ void processingStandardMessage(){
 			#if defined(BHbaccable)
 				//gearEngaged is on byte 3 bit 3 to 0
 				//actualGearGSI is on byte 3 bit 7 to 4
-				currentGear= rx_msg_data[3] & 0x0F;
+				currentGear= rx_msg_data[3] & 0x7;
+
+				//@netzmark - mute on reverse
+				if(rx_msg_data[3] == 0x7E) {
+				    onboardLed_blue_on();
+				} else {
+				    onboardLed_blue_off();
+				}
+				//@netzmark - end
 			#endif
 			break;
 		case 0x00000412: //se e' il messaggio che contiene la pressione dell'acceleratore (id 412), se é lungo 5 byte, se il valore é >51 (sfrutto le info ottenute sniffando)
@@ -560,6 +575,7 @@ void processingStandardMessage(){
 					//BH movement of mirror is requested
 					if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired || restoreOperativeMirrorsPosition){ //if required
 						if(!storeOperativeMirrorPosition && !parkMirrorsSteady){ //if Operative position was stored and mirror is not steady
+
 							can_tx(&parkMirrorMsgHeader, parkMirrorMsgData); //send msg
 						}
 					}
@@ -674,8 +690,94 @@ void processingStandardMessage(){
 			#endif
 			//contains status of ACC on byte 7, from bit 6 to 4 (0=disabled, 1=enabled, 2=engaged 3=engaged brake only, 4=override, 5=cancel)
 			break;
+
+			// @netzmark PDC DISABLE code (pdcAutoDisable)- begin
+			// ID: 0x0000054A - Panel PDC Button/LED Status
+			case 0x0000054A:
+				#if defined(C2baccable)
+					if(rx_msg_header.DLC >= 4){
+						if(rx_msg_data[3] == 0x40) {
+							pdc_state_disabled = 1; // LED ON - PDC disabled
+							//onboardLed_red_on();
+						} else {
+							pdc_state_disabled = 0; // LED OFF - PDC enabled
+							//onboardLed_red_off();
+						}
+					}
+				#endif
+				break;
+
+			// ID: 0x000003E7 - PDC Alarms status (front sensors beeping
+			case 0x000003E7:
+				#if defined(C2baccable)
+					if(rx_msg_header.DLC >= 6){
+						// Check Byte 2 and Byte 3 for sound status (0x0A and 0xAA means total "silence" on PDC sensors)
+						//if(rx_msg_data[4] > 0x01 && rx_msg_data[5] > 0x00){ //typically 0x0100 means no alarms, and changes if some alarms at the front side
+						if(rx_msg_data[0] > 0x00){ //typically 0x00 means no alarms, and 0x40 means some alarms (or Reverse gear but we don't serve it while R)
+							pdc_is_beeping = 1;
+							//onboardLed_red_on();
+						} else {
+							pdc_is_beeping = 0;
+							//onboardLed_red_off();
+						}
+					}
+				#endif
+				break;
+
+			// ID: 0x000001F5 - PDC disable/enable logic
+			// requestToTogglePDC is placed in functions_C2baccable.c
+			case 0x000001F5:
+			#if defined(C2baccable)
+				if(rx_msg_header.DLC >= 5){
+				    uint8_t currentPressure = rx_msg_data[4];
+
+				    // =========================================================================
+				    // --- Automated PDC disabler marker reseted ---
+				    // when Reverse gear is selected the car automatically enables disabled PDC system
+				    // =========================================================================
+				    if (reverseGearActive == 1 && pdc_auto_disabled == 1) {
+				        pdc_auto_disabled = 0;
+				        //onboardLed_blue_off();
+				    }
+				    // =========================================================================
+				    // --- DISABLE PDC ---
+				    // disable front PDC if the brake is pressed firmly enough and PDC system has detected something
+				    // we don't do it when the Reverse gear is selected
+				    // =========================================================================
+				    else if(currentPressure > 0x10) {
+				        if(reverseGearActive == 0 && pdc_is_beeping == 1 && pdc_auto_disabled == 0) {
+					        if (pdc_state_disabled == 0) {
+				                requestToTogglePDC = 1;
+				                pdc_auto_disabled = 1;
+				                //onboardLed_blue_on();
+				            }
+				        }
+				    }
+				    // =========================================================================
+				    // --- ENABLE PDC ---
+				    // re-enable front PDC if the brake is released and the car is able to make any move
+				    // =========================================================================
+				    else if(currentPressure < 0x10) { //I have left this threshold here to have ability to react on other level than for disable
+				        // we know it is not reverse Gear because of "if" of the function)
+				        // --- ENABLE PDC (if it was disabled automatically and the PDC system is really OFF)
+				        if(pdc_auto_disabled == 1 && pdc_state_disabled == 1) {
+				            requestToTogglePDC = 1;
+				            pdc_auto_disabled = 0;
+				            //onboardLed_blue_off();
+				        }
+				        // --- AUTOMATED PDC MARKER RESET (if the car enabled PDC automatically due to speed exceeding)
+				        else if (pdc_auto_disabled == 1 && pdc_state_disabled == 0) {
+				            pdc_auto_disabled = 0;
+				            //onboardLed_blue_off();
+				        }
+				    }
+				}
+			#endif
+			break;
 		default:
 	}
-
-
+//	// =========================================================================
+//	// TOGGLE PDC SHOT (requestToTogglePDC) placed in functions_C2baccable.c
+//	// =========================================================================
+	// @netzmark PDC auto disabler code - end
 }

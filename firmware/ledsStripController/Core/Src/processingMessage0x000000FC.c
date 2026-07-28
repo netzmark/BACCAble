@@ -22,6 +22,18 @@ void processingMessage0x000000FC(){
 			if(DynoModeEnabled!=0) DynoModeEnabled=0;
 			if(front_brake_forced!=0) front_brake_forced=255;
 		}
+		// @netzmark: used by PDC DISABLE code (pdcAutoDisable)
+		// Reverse gear on C2 detection
+		if(rx_msg_header.DLC >= 4) {
+			if(rx_msg_data[3] == 0x06) {
+				reverseGearActive = 1; // Reverse gear driving
+				//onboardLed_blue_on();
+			} else {
+				reverseGearActive = 0; // Forward driving or parking post
+				//onboardLed_blue_off();
+			}
+		}
+		// @netzmark - end
 	#endif
 	#if defined(C1baccable)
 		if(currentRpmSpeed<400){

@@ -452,3 +452,19 @@ uint8_t usbInited;
 uint32_t lastUartErrorCallback;
 
 uint8_t usbConnectedToSlave=0; //tells if usb port is connected to BH or C2
+
+// @netzmark PDC code - begin
+#if defined(C2baccable)
+	volatile uint8_t pdc_state_disabled	 = 0; // 0 = PDC enabled, 1 = PDC disabled (LED off)
+	volatile uint8_t pdc_is_beeping   	 = 0; // 1 = sensors in alarms
+	volatile uint8_t pdc_auto_disabled 	 = 0; // 1 = PDC was disabled with our procedure
+	volatile uint8_t  requestToTogglePDC = 0;
+	volatile uint8_t  reverseGearActive  =0; //used on CAN C2
+	uint8_t pdcMsgData[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	CAN_TxHeaderTypeDef pdcMsgHeader={.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x5B0, .DLC = 8};
+	volatile int pdc_send_counter=0;
+	volatile uint32_t last_pdc_shot_time = 0;
+#endif
+// @netzmark PDC code - end
+
+
