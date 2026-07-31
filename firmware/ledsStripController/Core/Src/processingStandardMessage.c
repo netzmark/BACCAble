@@ -304,15 +304,16 @@ void processingStandardMessage(){
 			#if defined(BHbaccable)
 				//gearEngaged is on byte 3 bit 3 to 0
 				//actualGearGSI is on byte 3 bit 7 to 4
-				currentGear= rx_msg_data[3] & 0x7;
+			currentGear= rx_msg_data[3] & 0x0F;
+			/*
+			Reverse 0x7E
+			Parking 0xFD
+			Neutral 0x00
+			1gear   0x11
+			2gear   0x22
+			...
+			 */
 
-				//@netzmark - mute on reverse
-				if(rx_msg_data[3] == 0x7E) {
-				    onboardLed_blue_on();
-				} else {
-				    onboardLed_blue_off();
-				}
-				//@netzmark - end
 			#endif
 			break;
 		case 0x00000412: //se e' il messaggio che contiene la pressione dell'acceleratore (id 412), se é lungo 5 byte, se il valore é >51 (sfrutto le info ottenute sniffando)
@@ -574,8 +575,7 @@ void processingStandardMessage(){
 				if(function_park_mirror){
 					//BH movement of mirror is requested
 					if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired || restoreOperativeMirrorsPosition){ //if required
-						if(!storeOperativeMirrorPosition && !parkMirrorsSteady){ //if Operative position was stored and mirror is not steady
-
+						if(!storeOperativeMirrorPosition && !parkMirrorsSteady){ //if Operative position was stored and mirror is not steady - Gaucho ori line code
 							can_tx(&parkMirrorMsgHeader, parkMirrorMsgData); //send msg
 						}
 					}

@@ -448,6 +448,7 @@
 	extern uint8_t leftParkMirrorPositionRequired;
 	extern uint8_t rightParkMirrorPositionRequired;
 	extern uint8_t parkMirrorOperativePositionNotStored;
+	extern uint32_t exitReverseTime; //@netzmark parkingMirror returning delay
 
 	//HAS_FUNCTION_ENABLED
 	extern uint8_t HAS_function_enabled;

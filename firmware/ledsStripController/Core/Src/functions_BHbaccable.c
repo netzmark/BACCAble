@@ -69,9 +69,71 @@
 			}
 		}
 
+		//--- @Gaucho original code replaced with @netzmark code below
+//		if(function_park_mirror){ //if function parkmirror is enabled
+//
+//			if(currentGear==0x0E){ //if reverse gear is selected
+//				if(!restoreOperativeMirrorsPosition){ //if we are not returning to operative position
+//					switch(turnIndicator){
+//						case 0x02: //left arrow inserted
+//							if(!leftParkMirrorPositionRequired && !rightParkMirrorPositionRequired) storeOperativeMirrorPosition=1;//store current mirror position, if mirror was not previously lowered
+//							leftParkMirrorPositionRequired=1; //Enable sending command to move mirror
+//							break;
+//						case 0x01: //right arrow inserted
+//							if(!leftParkMirrorPositionRequired && !rightParkMirrorPositionRequired) storeOperativeMirrorPosition=1;//store current mirror position, if mirror was not previously lowered
+//							rightParkMirrorPositionRequired=1; //Enable sending command to move mirror
+//							break;
+//						default:
+//					}
+//				}
+//			}else{
+//				if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired){ //if mirrors are potentially not in operative position,
+//					restoreOperativeMirrorsPosition=1; //request to restore mirrors to their original position
+//					restoreOperativeMirrorsPositionRequestTime=currentTime;
+//				}
+//				leftParkMirrorPositionRequired=0; //stop sending message to set Park position for mirrors
+//				rightParkMirrorPositionRequired=0;//stop sending message to set Park position for mirrors
+//			}
+//
+//
+//			//Prepare msg to send: set Operative position of the mirrors
+//			parkMirrorMsgData[0]= leftMirrorHorizontalOperativePos;
+//			parkMirrorMsgData[1]= leftMirrorVerticalOperativePos;
+//			parkMirrorMsgData[2]= rightMirrorHorizontalOperativePos;
+//			parkMirrorMsgData[3]= rightMirrorVerticalOperativePos;
+//
+//			//Prepare msg to send: if required, set park position of the mirrors
+//			if(leftParkMirrorPositionRequired){
+//				parkMirrorMsgData[0]= leftParkMirrorHorizontalPos;
+//				parkMirrorMsgData[1]= leftParkMirrorVerticalPos;
+//			}
+//			if(rightParkMirrorPositionRequired){
+//				parkMirrorMsgData[2]= rightParkMirrorHorizontalPos;
+//				parkMirrorMsgData[3]= rightParkMirrorVerticalPos;
+//			}
+//
+//
+//			if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired || restoreOperativeMirrorsPosition){ //if required
+//				if(!storeOperativeMirrorPosition){ //if operative position was stored
+//					if(currentTime-lastParkMirrorMsgTime>900){ //each 1000msec send a packet
+//						can_tx(&parkMirrorMsgHeader, parkMirrorMsgData); //send msg
+//						lastParkMirrorMsgTime=currentTime;
+//					}
+//				}
+//				if(restoreOperativeMirrorsPosition){
+//					if(currentTime-restoreOperativeMirrorsPositionRequestTime>15000){ //after 15 seconds
+//						restoreOperativeMirrorsPosition=0;
+//					}
+//				}
+//			}
+//		}
+
+		//--- @netzmark park mirror returning delay added - begin//
 		if(function_park_mirror){ //if function parkmirror is enabled
 
-			if(currentGear==0x0E){ //if reverse gear is selected
+			if(currentGear==0x0E){ //if reverse gear is selected 0x0E (masked 7E in fact)
+				exitReverseTime = 0; //Reset hysteresis timer while in Reverse
+
 				if(!restoreOperativeMirrorsPosition){ //if we are not returning to operative position
 					switch(turnIndicator){
 						case 0x02: //left arrow inserted
@@ -85,15 +147,36 @@
 						default:
 					}
 				}
-			}else{
+			}else if(currentGear == 0x0D || currentGear == 0x00){	//if Parking or Neutral (0x00) is selected we raise the mirrors immediately
+																	//protection against leaving the mirrors lowered in case of ignition OFF within added delay time
+																	//tested and working reliably on automatic gear box only
+																 		//maybe it is not good for manual gear box where maybe N is always set during transition from R>D
+																		//in this case remove this else if function
+				exitReverseTime = 0; //Reset timer for P/N
+
 				if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired){ //if mirrors are potentially not in operative position,
 					restoreOperativeMirrorsPosition=1; //request to restore mirrors to their original position
 					restoreOperativeMirrorsPositionRequestTime=currentTime;
 				}
 				leftParkMirrorPositionRequired=0; //stop sending message to set Park position for mirrors
 				rightParkMirrorPositionRequired=0;//stop sending message to set Park position for mirrors
-			}
+			}else{ //if Drive (D) or any other gear is selected
+				//If mirrors are lowered and timer is not armed yet, capture the exit time
+				if((leftParkMirrorPositionRequired || rightParkMirrorPositionRequired) && exitReverseTime == 0){
+					exitReverseTime = currentTime; //Capture the moment we switched to D
+				}
 
+				//Trigger return only after 10 seconds of constant driving forward
+				if(exitReverseTime != 0 && (currentTime - exitReverseTime > 10000)){ //HERE IT IS WHAT WE WANTED TO ADD - 10 seconds hysteresis delay
+					if(leftParkMirrorPositionRequired || rightParkMirrorPositionRequired){ //if mirrors are potentially not in operative position,
+						restoreOperativeMirrorsPosition=1; //request to restore mirrors to their original position
+						restoreOperativeMirrorsPositionRequestTime=currentTime;
+					}
+					leftParkMirrorPositionRequired=0; //stop sending message to set Park position for mirrors
+					rightParkMirrorPositionRequired=0;//stop sending message to set Park position for mirrors
+					exitReverseTime = 0; //Reset timer after execution
+				}
+			}
 
 			//Prepare msg to send: set Operative position of the mirrors
 			parkMirrorMsgData[0]= leftMirrorHorizontalOperativePos;
@@ -126,6 +209,7 @@
 				}
 			}
 		}
+		//--- @netzmark park mirror returning delay added - end//
 	}
 
 	uint8_t saveOnFlashBH(){
