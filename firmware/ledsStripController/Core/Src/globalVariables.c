@@ -470,3 +470,15 @@ uint8_t usbConnectedToSlave=0; //tells if usb port is connected to BH or C2
 	volatile uint8_t vehicle_is_moving = 0; // in default "car not moving"
 #endif
 // @netzmark PDC code - end
+
+// @netzmark MUTE_ON_REVERSE code - begin
+//MUTE_ON_REVERSE
+#if defined(BHbaccable)
+	volatile uint8_t audioSystemMuted = 0;          // 0 = play, 1 = muted
+	uint8_t audioSystemReverseMuted = 0;            // Main loop state machine rigger
+	volatile uint8_t centerConsoleRxMsgData[6] = {0x0F, 0x7F, 0x80, 0x00, 0x00, 0x00}; // audio panel and volume status
+	uint8_t centerConsoleTxMsgData[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	CAN_TxHeaderTypeDef centerConsoleTxMsgHeader = {.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x358, .DLC = 6};
+	uint32_t exitReverseAudioTime = 0;
+#endif
+//@netzmark MUTE_ON_REVERSE code - end

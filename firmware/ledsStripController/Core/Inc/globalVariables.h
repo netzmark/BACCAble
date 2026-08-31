@@ -478,4 +478,17 @@
 	#endif
 	// @netzmark PDC code - end
 
+	// @netzmark MUTE_ON_REVERSE code - begin
+	//MUTE_ON_REVERSE
+	#if defined(BHbaccable)
+		extern volatile uint8_t audioSystemMuted;             // 0 = play, 1 = muted (updated via CAN 0x5BE)
+		extern uint8_t audioSystemReverseMuted;               // 0 = idle, 1 = muted by us, 2 = skipped (manual mute active)
+		extern volatile uint8_t centerConsoleRxMsgData[6];    // stores pure radio panel status (updated via CAN 0x358)
+		extern uint8_t centerConsoleTxMsgData[6];             // buffer used to modify and send the CAN injection message
+		extern CAN_TxHeaderTypeDef centerConsoleTxMsgHeader;  // CAN TX header definition for 0x358 message
+		extern uint32_t exitReverseAudioTime;                 // countdown timer for audio restoration hysteresis
+	#endif
+	//@netzmark MUTE_ON_REVERSE code - end
+
+
 #endif /* INC_GLOBALVARIABLES_H_ */

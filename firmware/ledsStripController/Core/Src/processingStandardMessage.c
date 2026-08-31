@@ -7,14 +7,6 @@
 
 #include "processingStandardMessage.h"
 
-//	//@netzmark PDC DISABLE variables
-//#if defined(C2baccable)
-//	static uint8_t pdc_state_disabled	= 0; // 0 = PDC enabled, 1 = PDC disabled (LED off)
-//	static uint8_t pdc_is_beeping      	= 0; // 1 = sensors in alarms
-//	static uint8_t pdc_auto_disabled   	= 0; // 1 = PDC was disabled with our procedure
-//#endif
-//	//end
-
 void processingStandardMessage(){
 	#if defined(C1baccable)
 		if(function_route_msg_enabled==1){
@@ -153,6 +145,34 @@ void processingStandardMessage(){
 
 			#endif
 			break;
+
+
+			//@netzmark 0x116 test
+		case 0x00000116:
+		    #if defined(C2baccable)
+		        static uint8_t previous_D0 = 0;
+		        static uint8_t is_first_run = 1;
+		        static uint32_t last_change_time = 0;
+
+		        if (is_first_run) {
+		            previous_D0 = rx_msg_data[0];
+		            is_first_run = 0;
+		        } else {
+		            if (rx_msg_data[0] != previous_D0) {
+		                last_change_time = currentTime;
+		                previous_D0 = rx_msg_data[0];
+		                vehicle_is_moving = 1;
+		            }
+
+		            if (vehicle_is_moving == 1 && (currentTime - last_change_time >= 300)) {
+		                vehicle_is_moving = 0;
+		            }
+		            if (vehicle_is_moving == 1) {
+		                onboardLed_red_on();
+		            }
+		        }
+		    #endif
+		    break;
 
 		case 0x00000192:
 			#if defined(C1baccable)
@@ -296,6 +316,16 @@ void processingStandardMessage(){
 		   break;
 		case 0x00000358:
 			//should contain volume position (number of ticks in byte2, and direction in byte 2, bit 6 and 5)
+
+			// @netzmark MUTE_ON_REVERSE code - begin
+		   #if defined(BHbaccable)
+		    if(rx_msg_header.DLC >= 6) {
+				// Capture pure radio background to separate buffer
+		    	memcpy((uint8_t*)centerConsoleRxMsgData, rx_msg_data, 6);
+			 }
+			#endif
+			// @netzmark MUTE_ON_REVERSE code - end
+
 			break;
 		case 0x00000384:
 			processingMessage0x00000384();
@@ -663,6 +693,19 @@ void processingStandardMessage(){
 			#endif
 			//the park assistant button press event is on byte 1 bit 5 (1=pressed)
 			break;
+		//@netzmark MUTE_ON_REVERSE code - end
+		case 0x000005BE:
+			#if defined(BHbaccable)
+				if(rx_msg_header.DLC >= 1) {
+					if(rx_msg_data[0] == 0x30) {
+						audioSystemMuted = 1; // Radio is muted / paused
+					} else if(rx_msg_data[0] == 0x10) {
+						audioSystemMuted = 0; // Radio is playing music
+					}
+				}
+			#endif
+			break;
+		//@netzmark MUTE_ON_REVERSE code - end
 		case 0x0000073A:
 			//contains current date from byte 0 to 7.
 			//Hex values are used as characters in example 0x21 0x02 0x26 0x01 0x20 0x 25 represents
@@ -774,10 +817,11 @@ void processingStandardMessage(){
 				}
 			#endif
 			break;
+			//	// =========================================================================
+			//	// TOGGLE PDC SHOT (requestToTogglePDC) placed in functions_C2baccable.c
+			//	// =========================================================================
+				// @netzmark PDC auto disabler code - end
+
 		default:
 	}
-//	// =========================================================================
-//	// TOGGLE PDC SHOT (requestToTogglePDC) placed in functions_C2baccable.c
-//	// =========================================================================
-	// @netzmark PDC auto disabler code - end
 }

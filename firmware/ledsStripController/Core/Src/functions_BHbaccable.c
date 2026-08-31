@@ -210,6 +210,76 @@
 			}
 		}
 		//--- @netzmark park mirror returning delay added - end//
+
+
+		// --- REVERSE AUDIO MUTE SYSTEM ---
+		#define reverseAutoMuteEnabled 1
+		if(reverseAutoMuteEnabled){
+
+			// 1. STATE: REVERSE GEAR (0x0E) - Activate mute or log manual bypass
+			if(currentGear == 0x0E) {
+				exitReverseAudioTime = 0; // Reset timer while in Reverse
+
+				if(audioSystemReverseMuted == 0) {
+					if(audioSystemMuted == 0) {
+						// Music is playing -> copy from pure radio buffer and inject Mute button
+						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+						centerConsoleTxMsgData[2] = 0xE0; // Press Mute
+						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+
+						audioSystemReverseMuted = 1; // Locked by our automation (Safe rygiel)
+					} else {
+						audioSystemReverseMuted = 2; // User already muted the radio, bypass automation permanently
+					}
+				}
+			}
+			// 2. STATE: PARKING (0x0D) OR NEUTRAL (0x00) - Immediate restoration (Only for state 1)
+			else if(currentGear == 0x0D || currentGear == 0x00) {
+				exitReverseAudioTime = 0;
+
+				if(audioSystemReverseMuted == 1) { // Process ONLY if muted by us
+					if(audioSystemMuted == 1) { // Double check if radio is still muted
+						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+						centerConsoleTxMsgData[2] = 0xE0; // Press Mute again to toggle PLAY
+						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+					}
+				}
+				audioSystemReverseMuted = 0; // Safe reset to idle for both state 1 and 2
+			}
+			// 3. STATE: DRIVE (D) OR ANY OTHER GEAR - Safe delay only for automation
+			else {
+				// [NEW SAFE FIX]: If user manually unmuted on R, clear the state instantly on D entry (no delay needed)
+				if(audioSystemReverseMuted == 1 && audioSystemMuted == 0) {
+					audioSystemReverseMuted = 0;
+					exitReverseAudioTime = 0;
+				}
+
+				// If bypass state 2 is active, clear it instantly when moving forward (no delay needed)
+				if(audioSystemReverseMuted == 2) {
+					audioSystemReverseMuted = 0;
+					exitReverseAudioTime = 0;
+				}
+
+				// If muted by us (state 1) and timer is not armed yet, start countdown
+				if(audioSystemReverseMuted == 1 && exitReverseAudioTime == 0) {
+					exitReverseAudioTime = currentTime;
+				}
+
+				// Trigger return only after 3 seconds of constant driving forward
+				if(exitReverseAudioTime != 0 && (currentTime - exitReverseAudioTime > 3000)) {
+					if(audioSystemReverseMuted == 1) {
+						if(audioSystemMuted == 1) { // Restore only if still muted
+							memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+							centerConsoleTxMsgData[2] = 0xE0; // Toggle back to PLAY
+							can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+						}
+					}
+					audioSystemReverseMuted = 0; // Reset state machine to idle
+					exitReverseAudioTime = 0; // Reset timer after execution
+				}
+			}
+		}
+		//@netzmark MUTE_ON_REVERSE code - end
 	}
 
 	uint8_t saveOnFlashBH(){
