@@ -18,7 +18,7 @@
 	uint8_t params_setup_dashboardPageIndex=0;
 	uint8_t total_pages_in_params_setup_dashboard_menu=0;
 
-	uint8_t total_pages_in_dashboard_menu_gasoline=48;
+	uint8_t total_pages_in_dashboard_menu_gasoline=53;
 	uint8_t total_pages_in_dashboard_menu_diesel=56;
 	uint8_t currentParamElementSelection=0;
 
