@@ -77,63 +77,86 @@
 		lowConsume_process();
 
 		/*  @netzmark - to cheat IBS */
+		static uint8_t function_ibs_cheat_enabled = 1; //to test the function only
+		//if(function_ibs_cheat_enabled) {
+		if(function_ibs_cheat_enabled) {
+		    enum {
+		        battery_soc_min      = 75,//75
+		        battery_soc_forced   = 75,//75
+		        battery_soc_max      = 98,
+		        speed_start_cheating = 30,
+		        speed_stop_cheating  = 25
+		    };
 
-//		static uint8_t function_ibs_cheat_enabled = 1; //to test the function only
-//
-//		if(function_ibs_cheat_enabled) {
-//
-//		    enum {
-//		        battery_soc_min      = 50, //75
-//		        battery_soc_forced   = 90, //75
-//		        battery_soc_max      = 98,
-//		        speed_start_cheating = 30,
-//		        speed_stop_cheating  = 25
-//		    };
-//
-////		    static uint8_t ibs_cheat_active = 0;
-////
-////		    // Histeresis logic
-////		    if (currentSpeed_km_h > speed_start_cheating) {
-////		        ibs_cheat_active = 1;
-////		    } else if (currentSpeed_km_h < speed_stop_cheating) {
-////		        ibs_cheat_active = 0;
-////		    }
-//
-//		    // TRIGGER: If CAN interrupt set the flag, prepare a spoof frame
-//		    if (new_41A_flag) {
-//		        new_41A_flag = 0;
-//
-////		        if (ibs_cheat_active &&
-////		            batteryStateOfCharge >= battery_soc_min &&
-////		            batteryStateOfCharge < battery_soc_max) {
-//
-//		            // Clone the original frame from the global buffer to keep all other bytes (temp, current, etc.)
-//		            uint8_t forced_soc_data[8];
-//		            memcpy(forced_soc_data, (void*)last_41A_raw_data, 8);
-//
-//		            // MODIFICATION: Set SoC to battery_soc_forced and force the Status Bit (0x80)
-//		            forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;
-//
-//		            // Prepare the TX Header for the 0x41A frame
-//		            CAN_TxHeaderTypeDef tx_header;
-//		            tx_header.StdId = 0x41A;
-//		            tx_header.IDE   = CAN_ID_STD;
-//		            tx_header.RTR   = CAN_RTR_DATA;
-//		            tx_header.DLC   = 8;
-//		            tx_header.TransmitGlobalTime = DISABLE;
-//
-//		            onboardLed_red_on(); // for the test only
-//		            // Send a single spoofed frame
-//		            //can_tx(&tx_header, forced_soc_data);
-//
-//		            // or - Send a serie of 3 spoofed frames
-//		            for(uint8_t i = 0; i < 3; i++) {
-//		            	can_tx(&tx_header, forced_soc_data);
-//		            	}
-//		        //}
+		    static uint8_t ibs_cheat_active  = 0;
+		    static uint32_t lastSentIBS_spoof = 0;
+		    static uint8_t spoof_retry_count = 0;
+		    static uint8_t forced_soc_data[7];
+
+		    // Static header to avoid re-initializing every 2ms loop
+		    static CAN_TxHeaderTypeDef tx_header;
+		    tx_header.StdId = 0x41A;
+		    tx_header.IDE   = CAN_ID_STD;
+		    tx_header.RTR   = CAN_RTR_DATA;
+		    tx_header.DLC   = 7; // Corrected DLC from sniffer
+		    tx_header.TransmitGlobalTime = DISABLE;
+
+		    // 1. HYSTERESIS LOGIC: Speed-based activation
+//		    if (currentSpeed_km_h > speed_start_cheating) {
+//		        ibs_cheat_active = 1;
+//		    } else if (currentSpeed_km_h < speed_stop_cheating) {
+//		        ibs_cheat_active = 0;
+//		        spoof_retry_count = 0; // Stop any pending spoofing
 //		    }
-//		}
 
+		    //to remove after tests
+            if (requestedId == 252) {
+                ibs_cheat_active = 1;
+            } else if (requestedId != 252) {
+                ibs_cheat_active = 0;
+                spoof_retry_count = 0; // Immediate stop when switching menu
+            }
+            //to remove after tests - END
+
+		    // 2. TRIGGER: When a new original frame is received (approx. every 100ms)
+		    if (new_41A_flag) {
+		        new_41A_flag = 0;
+
+		        // Check activation conditions
+		        if (ibs_cheat_active &&
+		            batteryStateOfCharge >= battery_soc_min &&
+		            batteryStateOfCharge < battery_soc_max) {
+
+		            // Clone the original 7 bytes to keep temp, current, etc.
+		            memcpy(forced_soc_data, (void*)last_41A_raw_data, 7);
+
+		            // MODIFICATION: Inject forced SoC while preserving original Status Bit (MSB)
+		            forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;
+
+		            // MODIFICATION type2: Inject forced SoC with setting on the Status Bit (MSB)
+		            //forced_soc_data[1] = 0x80 | (uint8_t)battery_soc_forced;
+
+		            // Trigger the sequence: send spoof frame in the next 5 loop cycles (~10ms)
+		            // This is more effective than a tight for-loop for overriding ECU memory
+		            spoof_retry_count = 10;
+		        }
+		    }
+
+		    // 3. EXECUTION: Send one spoof frame per loop cycle if counter is active
+		    if (spoof_retry_count > 0) {
+		        // @netzmark: Use currentTime to ensure 3ms gap between spoof frames
+		        if (currentTime - lastSentIBS_spoof >= 3) {
+
+		            if (can_tx(&tx_header, forced_soc_data) == HAL_OK) {
+		                spoof_retry_count--;
+		                lastSentIBS_spoof = currentTime; // Update timer after successful send
+		            }
+		            //onboardLed_red_on();
+		        }
+		    } else {
+		        //onboardLed_red_off();
+		    }
+		}
 //		/*  @netzmark - END */
 
 		if(QV_exhaust_flap_function_enabled){
