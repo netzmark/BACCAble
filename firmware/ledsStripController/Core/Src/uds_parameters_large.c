@@ -83,15 +83,17 @@
 
 	/* Virtual groups definitions
 	 * virtual groups may contain 3 or 4 parameters, for 1 or two parameters use regular single/couple visualization
-	 * four subadresses must be filled, if only three in use - put the last one as 200 or "UDS_STOP_ID", as shown in the samples below
+	 * four sub-adresses must be filled, if only three in use - put the last one as 200 or "UDS_STOP_ID", as shown in the samples below
 	*/
 	const uds_params_group_element uds_params_groups_array[] = {
 	    { 255, {91, 92, 93, 94}},	// Group Misfire C1-C4
 	    { 254, {18, 19, 34, 35}},	// Group 41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS 	(for my IBS debug purposes)
 	    { 253, {18, 19, 3, 34}},	// Group 41A-byte2, 41A-byte3, SoC-native,  SoC-UDS (for my IBS debug purposes)
 	    { 252, {35, 3, 34, 200}},	// Group VBAT-UDS, SoC-native,  SoC-UDS 			(for my IBS debug purposes)
-	    { 251, {30, 42, 23, 22}},	// Group Temp: oil, water, inlet, outlet
-	    { 250, {30, 42, 33, 200}},	// Group Temp: oil, water, gear
+	    { 251, {35, 3, 34, 200}},	// Group VBAT-UDS, SoC-native,  SoC-UDS 			(for my IBS debug purposes)
+	    { 250, {30, 42, 23, 22}},	// Group Temp: oil, water, inlet, outlet
+	    { 249, {30, 42, 33, 200}},	// Group Temp: oil, water, gear
+	    { 248, {28, 89, 31, 200}},	// Group Temp: oil quantity(L), oil level(mm), oil quality
 //	    { 202, {30, 42, 23, 200}}, 			// Sample of three parameters screen declaration, 200 means slot is not used
 //	    { 202, {30, 42, 23, UDS_STOP_ID}}, 	// Sample of three parameters screen declaration, UDS_STOP_ID means slot is not used
 //	    { 201, {x,  y, v, z}}, 				// Starting address
@@ -108,17 +110,22 @@
 					{.name="Oil: $1.2fL, Quality: $3.0f%",				.udsParamId={28,	31		}}, //param couple: OIL quantity(L) and Oil Quality
 					{.name="Oil: $2.0fmm, Quality: $3.0f%",				.udsParamId={89,	31		}}, //param couple: OIL level(mm) and Oil Quality
 					{.name="Oil: $1.2fL, Level: $2.0fmm",				.udsParamId={28,	89		}}, //param couple: OIL quantity(L) and Oil level(mm)
+					{.name="Oil:  $1.2fL,  $2.0fmm, $3.0f%",           .udsParamId={248,	248		}}, // @netzmark virtual group: OIL quantity(L) and Oil level(mm) and Oil Quality
 					{.name="Battery: $3.0f%, $4.1fA",					.udsParamId={3,		4		}}, //param couple: BAT State Of Charge and current
 					{.name="Battery: $2.1fV, $4.1fA",					.udsParamId={35,	4		}}, //param couple: BAT voltage and current
 					{.name="Battery: $2.1fV, SoC: $3.0f%",				.udsParamId={35,	3		}}, // @netzmark: param couple: BAT voltage and State Of Charge
 					{.name="IC In/Out: $3.0f/$3.0f""\xB0""C",			.udsParamId={23,	22		}}, // @netzmark: param couple: Intercooler input/output  air temperature
-					{.name="Misfires total: $3.0f",						.udsParamId={90,	90		}}, // @netzmark: Total misfire C1-C4 (gasoline)
+					{.name="Pressure: $2.1fbar, EGT: $3.0f""\xB0""C",	.udsParamId={24,	40		}}, // @netzmark: Boost Absolute Pressure + Exaust gas temperature
+					{.name="Exhaust/Cat: $3.0f/$3.0f""\xB0""C",			.udsParamId={40,	41		}}, // @netzmark: param couple: Exhaust/Cat temperature
+					{.name="Misfires:$3.0f,    M/A:$3.0f""\xB0""C",  	.udsParamId={90,	32		}}, // @netzmark: param couple: Total misfire C1-C4 (gasoline) and M/A temp
+					{.name="Misfires total:$3.0f",						.udsParamId={90,	90		}}, // @netzmark virtual group: Total misfire C1-C4 (gasoline)
 					{.name="Misfires: $2.0f; $2.0f; $2.0f; $2.0f;",		.udsParamId={255,   255		}}, // @netzmark: Misfires 1+2+3+4
 					{.name="$3.0f, $3.0f, $3.0f%, $2.1fV",				.udsParamId={254,   254		}}, // @netzmark: TO TEST ONLY "41A-byte2, 41A-byte3, SoC-UDS, VBAT-UDS"
 					{.name="$3.0f, $3.0f, $3.0f%, $3.0f%",				.udsParamId={253,   253		}}, // @netzmark: TO TEST ONLY "41A-byte2, 41A-byte3, SoC-native, SoC-UDS"
-					{.name="$2.1fV, $3.0f%, $3.0f%",					.udsParamId={252,   252		}}, // @netzmark: TO TEST ONLY "VBAT-UDS, SoC-native, SoC-UDS"
-					{.name="O:$2.0fC W:$2.0fC In:$2.0fC Out:$2.0fC",	.udsParamId={251,   251		}}, // @netzmark: TO TEST ONLY "temperatures: oil, water, inlet, outlet"
-					{.name="Oil:$3.0fC Wat:$3.0fC Gear:$2.0fC",			.udsParamId={250,   250		}}, // @netzmark: TO TEST ONLY "temperatures: oil, water, gear"
+					{.name="CheatON:  $2.2fV, $2.0f%, $2.0f%",			.udsParamId={252,   252		}}, // @netzmark: TO TEST ONLY "VBAT-UDS, SoC-native, SoC-UDS"
+					{.name="CheatOFF: $2.2fV, $2.0f%, $2.0f%",			.udsParamId={251,   251		}}, // @netzmark: TO TEST ONLY "VBAT-UDS, SoC-native, SoC-UDS"
+					{.name="O:$2.0fC W:$2.0fC In:$2.0fC Out:$2.0fC",	.udsParamId={250,   250		}}, // @netzmark virtual group: "temperatures: oil, water, inlet, outlet"
+					{.name="Oil:$3.0fC Wat:$3.0fC Gear:$2.0fC",         .udsParamId={249,   249		}}, // @netzmark virtual group: "temperatures: oil, water, gear"
 					{.name="Battery SoC: $3.0f%",						.udsParamId={34,	34		}}, //Battery State Of Charge
 					{.name="Battery current: $4.1fA",					.udsParamId={4,		4		}}, //Battery Current
 					{.name="Battery voltage: $2.1fV",					.udsParamId={35,	35		}}, //Battery Voltage
