@@ -284,6 +284,7 @@
 		extern uint8_t AutostartMsgCounter;
 		extern uint8_t carSteadyCounter; //tells how many seconds car is steady (200 max value = 2000msec)
 		extern uint8_t brakeIntervention_ACC_ESC_ASR;
+		extern volatile uint8_t autostartActiveBurst; //@netzmark Autostart improvement
 
 		//CLOSE_WINDOWS
 		extern uint8_t function_close_windows_with_door_lock;
@@ -462,6 +463,7 @@
 	extern uint8_t usbConnectedToSlave;
 
 	// @netzmark PDC code - begin
+	//PDC_AUTO_DISABLE
 	#if defined(C2baccable)
 		extern volatile uint8_t pdc_state_disabled;
 		extern volatile uint8_t pdc_is_beeping;
@@ -472,8 +474,8 @@
 		extern CAN_TxHeaderTypeDef pdcMsgHeader;
 		extern volatile int pdc_send_counter;
 		extern volatile uint32_t last_pdc_shot_time;
+		extern volatile uint8_t vehicle_is_moving;
 	#endif
 	// @netzmark PDC code - end
-
 
 #endif /* INC_GLOBALVARIABLES_H_ */

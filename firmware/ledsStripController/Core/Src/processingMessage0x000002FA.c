@@ -91,32 +91,82 @@ void processingMessage0x000002FA(){
 			}
 		}
 
+		//Gaucho ori code
+//		if(function_acc_autostart){
+//			if(ACC_engaged){
+//				if(carSteadyCounter==200 && brakeIntervention_ACC_ESC_ASR){ //if car is steady and brake is pressed by ACC
+//					if(rx_msg_data[0]==0x10){ //if no button was pressed on cruise control pad
+//						if (currentTime-lastSentAutostartMsg>500){
+//							rx_msg_data[0] = 0x90; //Res button press
+//
+//							if(function_acc_autostart==2){
+//								rx_msg_data[0] = 0x08; //ACC gently up button press
+//							}
+//							rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16); //increase the counter
+//							rx_msg_data[2]=calculateCRC(rx_msg_data,rx_msg_header.DLC); //update checksum
+//
+//							can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data); //send message to simulate RES button press
+//							rx_msg_data[0]=0x10; //restore value 10 to avoid unwanted behaviours with subsequent pieces of code
+//							//increase a counter
+//							AutostartMsgCounter++;
+//							if (AutostartMsgCounter>= 5){
+//								AutostartMsgCounter=0;
+//								lastSentAutostartMsg=currentTime;
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+
+		//@netzmark corrected code
 		if(function_acc_autostart){
-			if(ACC_engaged){
-				if(carSteadyCounter==200 && brakeIntervention_ACC_ESC_ASR){ //if car is steady and brake is pressed by ACC
-					if(rx_msg_data[0]==0x10){ //if no button was pressed on cruise control pad
-						if (currentTime-lastSentAutostartMsg>150){ 	// @netzmark: ori it was 500 (once each 1,5 seconds), 150 for me works better
-							rx_msg_data[0] = 0x90; //Res button press
+		    if(ACC_engaged){
 
-							if(function_acc_autostart==2){
-								rx_msg_data[0] = 0x08; //ACC gently up button press
-							}
-							rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16); //increase the counter
-							rx_msg_data[2]=calculateCRC(rx_msg_data,rx_msg_header.DLC); //update checksum
+		        if(carSteadyCounter == 200 && brakeIntervention_ACC_ESC_ASR == 1){
 
-							can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data); //send message to simulate RES button press
-							rx_msg_data[0]=0x10; //restore value 10 to avoid unwanted behaviours with subsequent pieces of code
-							//increase a counter
-							AutostartMsgCounter++;
-							if (AutostartMsgCounter>= 3){ 			// @netzmark: ori it was 5 (simulating a 100msec button press event), I do it 3 with relation to line 70
-								AutostartMsgCounter=0;
-								lastSentAutostartMsg=currentTime;
-							}
-						}
-					}
-				}
-			}
+		            if (autostartActiveBurst == 0) {
+		                if (currentTime - lastSentAutostartMsg > 450) { //real 450ms pause
+		                    autostartActiveBurst = 1;
+		                }
+		            }
+
+		            // 5 frames repetitions synchronised with original 0x10
+		            if (autostartActiveBurst == 1) {
+		                if(rx_msg_data[0] == 0x10){
+
+		                    rx_msg_data[0] = 0x90; // RES button press
+		                    if(function_acc_autostart == 2){
+		                        rx_msg_data[0] = 0x08; // ACC gently up button press
+		                    }
+
+		                    rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16);
+		                    rx_msg_data[2] = calculateCRC(rx_msg_data, rx_msg_header.DLC);
+
+		                    can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data);
+
+		                    rx_msg_data[0] = 0x10;
+
+		                    AutostartMsgCounter++;
+
+		                    if (AutostartMsgCounter >= 5) {
+		                        AutostartMsgCounter = 0;
+		                        lastSentAutostartMsg = currentTime;
+		                        autostartActiveBurst = 0;
+		                    }
+		                }
+		            }
+		        }
+
+		        // Just for any case
+		        if(carSteadyCounter < 200 || brakeIntervention_ACC_ESC_ASR == 0){
+		            AutostartMsgCounter = 0;
+		            autostartActiveBurst = 0;
+		        }
+
+		    }
 		}
+
 
 
 		if(cruiseControlDisabled && ACC_Disabled){ //if we are allowed to press buttons, use them in baccable menu

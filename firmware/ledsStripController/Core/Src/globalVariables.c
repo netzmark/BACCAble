@@ -274,6 +274,7 @@ const char *FW_VERSION=_FW_VERSION;
 	uint8_t AutostartMsgCounter=0;
 	uint8_t carSteadyCounter=0; //tells how many seconds car is steady (200 max value = 2000msec)
 	uint8_t brakeIntervention_ACC_ESC_ASR=0; //tells if brake is pressed
+	volatile uint8_t autostartActiveBurst=0; //@netzmark Autostart improvement
 
 	//CLOSE_WINDOWS
 	uint8_t function_close_windows_with_door_lock=0; //0=disabled, 1=close windows1, 2=close windows2
@@ -455,17 +456,17 @@ uint32_t lastUartErrorCallback;
 uint8_t usbConnectedToSlave=0; //tells if usb port is connected to BH or C2
 
 // @netzmark PDC code - begin
+//PDC_AUTO_DISABLE
 #if defined(C2baccable)
 	volatile uint8_t pdc_state_disabled	 = 0; // 0 = PDC enabled, 1 = PDC disabled (LED off)
 	volatile uint8_t pdc_is_beeping   	 = 0; // 1 = sensors in alarms
 	volatile uint8_t pdc_auto_disabled 	 = 0; // 1 = PDC was disabled with our procedure
 	volatile uint8_t  requestToTogglePDC = 0;
-	volatile uint8_t  reverseGearActive  =0; //used on CAN C2
+	volatile uint8_t  reverseGearActive  =0; //used on CAN C2 only
 	uint8_t pdcMsgData[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	CAN_TxHeaderTypeDef pdcMsgHeader={.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x5B0, .DLC = 8};
 	volatile int pdc_send_counter=0;
 	volatile uint32_t last_pdc_shot_time = 0;
+	volatile uint8_t vehicle_is_moving = 0; // in default "car not moving"
 #endif
 // @netzmark PDC code - end
-
-
