@@ -26,7 +26,9 @@
 	void sendParamsSetupDashboardPageToSlaveBaccable(void);
 	void sendDashboardPageToSlaveBaccable(void);
 	float getNativeParam(uint8_t paramId);
-	void buildLineWithFormat(const char* template, float *values, const uint8_t *paramId, char* result);
+	//@netzmark - to confirm
+	//void buildLineWithFormat(const char* template, float *values, const uint8_t *paramId, char* result);
+	void buildLineWithFormat(const char* template, const uint8_t *paramId, char* result);
 	uint8_t removePatterns(char *str);
 	uint32_t getFreeRAM(void);
 	void clearDashboardBaccableMenu(void);

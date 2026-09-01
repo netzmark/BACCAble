@@ -27,6 +27,18 @@
     uint8_t  requestedId = 0;
     uint8_t  idLeft = 0;
     uint8_t  idRight = 0;
+
+#ifndef LARGE_DISPLAY
+    /* Fallback cache for clean configuration build 
+     * to can compile without #large_display
+     * */
+    float uds_values_cache[MAX_UDS_PARAMS] = {0.0f};
+
+    /* Standard type fallback array matching header declaration with UDS_STOP_ID guard */
+    const uds_params_group_element uds_params_groups_array[] = {
+        { 200, {0, 0, 0, 0} }
+    };
+#endif
 #endif
     /* @netzmark: END */
  
@@ -1750,8 +1762,11 @@ if(baccableDashboardMenuVisible) {
 	    const char* tpl = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name;
 	    const uint8_t* ids = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId;
  
+ 		//@netzmark - to confirm
 	    // Fill stringToPrint with formatted data (converts UDS IDs to human-readable values)
-	    buildLineWithFormat(tpl, dashboardParamCouple, ids, stringToPrint);
+	    //buildLineWithFormat(tpl, dashboardParamCouple, ids, stringToPrint);
+	    buildLineWithFormat(tpl, ids, stringToPrint);
+
  
 	    // Calculate text length and enforce the physical screen limit (e.g., 30 chars)
 	    uint8_t tmpStrLen = strlen(stringToPrint);
@@ -1768,15 +1783,24 @@ if(baccableDashboardMenuVisible) {
  
 	    // Calculate total packet size: Header(1) + Text(tmpStrLen) + NULL Terminator(1)
 	    // Sending +2 ensures at least one NULL byte follows the text, killing "ü-umlaut" at 28 characters bug.
-	    uint8_t toSend = tmpStrLen + 2;
+
+	    // @netzmark - to test the menu refresh speed
+//	    uint8_t toSend = tmpStrLen + 2;
  
-	    // Final safety check to stay within the physical bounds of the uartTxMsg array
-	    if (toSend > (DASHBOARD_MESSAGE_MAX_LENGTH + 1)) {
-	        toSend = DASHBOARD_MESSAGE_MAX_LENGTH + 1;
-	    }
- 
-	    // Push the clean, null-terminated frame to the UART transmission queue
-	    addToUARTSendQueue(uartTxMsg, toSend);
+//	    // Final safety check to stay within the physical bounds of the uartTxMsg array
+//	    if (toSend > (DASHBOARD_MESSAGE_MAX_LENGTH + 1)) {
+//	        toSend = DASHBOARD_MESSAGE_MAX_LENGTH + 1;
+//	    }
+//
+//	    // Push the clean, null-terminated frame to the UART transmission queue
+//	    addToUARTSendQueue(uartTxMsg, toSend);
+	    /*
+	     * @netzmark: Ensure atomic transmission of the exact configuration width.
+	     * Dynamic packet size 'toSend' introduces UART sync-latency on the Slave side.
+	     * Total fixed frame length equals: 1 byte Header + Configuration Max Length.
+	     */
+	    // added instead of dynamic "to send"
+	    addToUARTSendQueue(uartTxMsg, (DASHBOARD_MESSAGE_MAX_LENGTH + 1));
 	}
  
 	/* @netzmark - END */
@@ -1976,7 +2000,9 @@ if(baccableDashboardMenuVisible) {
 	*/
  
 			/* @netzmark: void buildLineWithFormat updated to create multi parameters screens */
-	void buildLineWithFormat(const char* template, float *values, const uint8_t *paramIds, char *result) {
+		//@netzmark - to confirm	
+	//void buildLineWithFormat(const char* template, float *values, const uint8_t *paramIds, char *result) {
+	void buildLineWithFormat(const char* template, const uint8_t *paramIds, char *result) {
 	    uint8_t i = 0, which = 0;
 	    uint8_t idLeft = paramIds[0];
 	    uint8_t idRight = paramIds[1];
@@ -2009,8 +2035,9 @@ if(baccableDashboardMenuVisible) {
 	            float valToPrint = NAN;
 				if (currentId < MAX_UDS_PARAMS) {
 					if (maxHold_enabled && which < 2 && !activeGroup) {
-						//valToPrint = dashboardParamCouple[which];
-						valToPrint = values[which];
+					//@netzmark - to confirm
+						valToPrint = dashboardParamCouple[which];
+						//valToPrint = values[which];
 					} else if (single_uds_params_array[currentId].reqId <= 0xFF) {
 						valToPrint = getNativeParam(currentId);
 					} else {
