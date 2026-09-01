@@ -72,5 +72,16 @@
 	// #define DISABLE_CLEAR_FAULTS_BH 			// if uncommented it will disable "clear faults" functionality.
 	// #define DISPLAY_INFO_CODE 0x09			// if uncommented it will display preferred icon on dashboard (0x05=Aux, 0x06=left USB, 0x07=Right USB, 0x08=Center USB, 0x09=Bluetooth) but it may cause temporary screen freeze and string overlapping if other devices in the car tries to print the same string on dashboard.
 	// Note: The define DISABLE_ODOMETER_BLINK in C1 section above, applies to BH too (in case you use a single canable board on BH to disable odometer blink on dashboard)
+
+
+
+	// The following defines are used, if uncommented, by every boards:	
+
+	// #define HSE_ENABLED_FOR_UCAN				// if uncommented, allows to enable more stable external oscillator (HSE) using.
+												// optional feature, to theoretically improve low-temperature stability
+												// only works on boards with an external oscillator, such as the UCAN
+												// do not attempt to use this on Baccable/Cannable hardware without an on-board HSE oscillator.
+												// by @netzmark
+	
 	
 #endif /* INC_USER_CONFIG_H_SAMPLE_ */

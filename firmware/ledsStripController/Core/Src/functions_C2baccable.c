@@ -66,27 +66,50 @@
 				}
 			}
 		}
+		
 		// @netzmark PDC DISABLE code - simulated push of the park sensors button, followed by our own release.
 		// Not done in case 0x5B0 because that frame is repeated every 1-2sec and the PDC reacts on the release.
+		//=========================================================================
+		//TOGGLE PDC SHOT followed with Release button simulation (to get faster reaction)
+		// this made intentionally NOT in case 0x000005B0 of processingStandardMessages.c because:
+		// the system frame 0x5B0 containing the button status is repeated very slowly (1-2sec interval),
+		// PDC system reacts on Release D1:0x00 after Push D1:0x20
+		// so the speed of react would be random and depend on the moment we sent the disable between the system frames
+		// that's why we follow push with our independent release code
+		//=========================================================================
+
 		if (parkSensorsMuteFunctionEnabled){
 		    if (requestToTogglePDC == 1) {
 		        if (pdc_send_counter == 0) {
 		            pdc_send_counter = 1;
 		            last_pdc_shot_time = currentTime;
 		            pdcMsgData[1] = 0x20;  // push button
-		            can_tx(&pdcMsgHeader, pdcMsgData);
+		            can_tx(&pdcMsgHeader, pdcMsgData); // sent
 		        }
 
-		        // raising the hold time allows a short beep before the PDC is disabled
-		        if (pdc_send_counter == 1 && (currentTime - last_pdc_shot_time > TIMING__C2____PDC_BUTTON_PRESS_MS)) {
+		        // Prepare to send pdc button release code
+		        if (pdc_send_counter == 1 && (currentTime - last_pdc_shot_time > 50)) { //changing the time we can allow for short beep before PDC disabling
 		            pdc_send_counter = 0;
 		            pdcMsgData[1] = 0x00;  // release button
-				can_tx(&pdcMsgHeader, pdcMsgData);
-		            requestToTogglePDC = 0; // cleared once push and release are both done
-			}
+		            can_tx(&pdcMsgHeader, pdcMsgData); // sent
+		            requestToTogglePDC = 0; // set after push and release done
+		        }
+		    }
 		}
-		}
-	}
+
+//		=========================================================================
+//		Simplified version with no release simulation
+//		=========================================================================
+//		if (parkSensorsMuteFunctionEnabled){
+//			if (requestToTogglePDC == 1) {
+//				requestToTogglePDC = 0;
+//				pdcMsgData[1] = 0x20;  // push button// push button sent
+//				can_tx(&pdcMsgHeader, pdcMsgData);
+//			}
+//		}
+		// @netzmark PDC DISABLE code - end
+	}		
+
 
 	void dynoToggle(){
 		if(DynoStateMachine == 0xff){ // there is no dyno Start sequence in progress

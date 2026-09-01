@@ -8,6 +8,13 @@
 #include "processingExtendedMessage.h"
 #include "security_access_mm10ja.h" //pumpForce test25/07/2026 - algoritmo MM10JA per calcolo key ECM
 
+
+/* @netzmark: to create multi parameters screens */
+#include "uds_parameters.h"
+extern uint8_t actuallyRequestedUdsId;
+extern uint8_t requestedId;
+/* @netzmark: END */
+
 void processingExtendedMessage(){
 	#if defined(C1baccable)
 		if(immobilizerEnabled && (engineOnSinceMoreThan5seconds<500)){ //if immo enabled and engine is off
@@ -57,44 +64,98 @@ void processingExtendedMessage(){
 			}
 		} //end of immobilizer section
 
-		if ((rx_msg_header.ExtId==single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyId) && baccableDashboardMenuVisible){ //if we received UDS message with current selected parameter, let's aquire it
-			if(dashboard_menu_indent_level==1 && main_dashboardPageIndex==1){ //if we are in show params menu
-				onboardLed_blue_on();
-				if (rx_msg_header.DLC>=4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen){
-					uint8_t numberOfBytesToRead=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen;
-					// Limita il numero di byte a un massimo di 4 per evitare overflow
-					if (numberOfBytesToRead > 4) {
-						numberOfBytesToRead = 4;
-					}
-					uint32_t tmpVal=0; //take value of received parameter
+	//ori Gaucho's code
+//		if ((rx_msg_header.ExtId==single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyId) && baccableDashboardMenuVisible){ //if we received UDS message with current selected parameter, let's aquire it
+//			if(dashboard_menu_indent_level==1 && main_dashboardPageIndex==1){ //if we are in show params menu
+//				onboardLed_blue_on();
+//				if (rx_msg_header.DLC>=4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen){
+//					uint8_t numberOfBytesToRead=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyLen;
+//					// Limita il numero di byte a un massimo di 4 per evitare overflow
+//					if (numberOfBytesToRead > 4) {
+//						numberOfBytesToRead = 4;
+//					}
+//					uint32_t tmpVal=0; //take value of received parameter
+//
+//					// Costruisce il valore a partire dai byte ricevuti
+//					for (size_t i = 0; i < numberOfBytesToRead; i++) {
+//						tmpVal |= ((uint32_t)rx_msg_data[4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+i]) << (8 * (numberOfBytesToRead - 1 - i));
+//					}
+//
+//					tmpVal+=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyValOffset;
+//					float tmpVal2 =tmpVal * single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScale;
+//					tmpVal2 +=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScaleOffset;
+//
+//					if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
+//						currentParamElementSelection=0; //single param
+//					}
+//
+//					if(maxHold_enabled){
+//						if(isnan(dashboardParamCouple[currentParamElementSelection])){
+//							dashboardParamMaxHold[currentParamElementSelection]=tmpVal2; //first update after navigation: reset max hold
+//						}else if(tmpVal2 > dashboardParamMaxHold[currentParamElementSelection]){
+//							dashboardParamMaxHold[currentParamElementSelection]=tmpVal2; //new maximum found
+//						}
+//						dashboardParamCouple[currentParamElementSelection]=dashboardParamMaxHold[currentParamElementSelection];
+//					}else{
+//						dashboardParamCouple[currentParamElementSelection]=tmpVal2; //normal behavior
+//					}
+//					sendDashboardPageToSlaveBaccable();//send parameters to BH
+//				}
+//			}
+//		}
+		
+		/* @netzmark: to create multi parameters screens + Ori 2026 MaxHold integration */
+// --- 1. CONTEXT CHECK (Directly replacing Gucho's block) ---
+if (baccableDashboardMenuVisible && dashboard_menu_indent_level == 1 && main_dashboardPageIndex == 1) {
 
-					// Costruisce il valore a partire dai byte ricevuti
-					for (size_t i = 0; i < numberOfBytesToRead; i++) {
-						tmpVal |= ((uint32_t)rx_msg_data[4+single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyOffset+i]) << (8 * (numberOfBytesToRead - 1 - i));
-					}
+    // Use actuallyRequestedUdsId as our only anchor.
+    // In Group Mode, Rotator sets it and holds it for 500ms (Lag-proof).
+    uint8_t currentId = actuallyRequestedUdsId;
 
-					tmpVal+=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyValOffset;
-					float tmpVal2 =tmpVal * single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScale;
-					tmpVal2 +=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].replyScaleOffset;
+    // Safety: only process valid UDS (0- MAX_UDS_PARAMS = 100 today)
+    if (currentId < MAX_UDS_PARAMS && single_uds_params_array[currentId].reqId > 0xFF) {
 
-					if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
-						currentParamElementSelection=0; //single param
-					}
+        // --- 2. ADDRESS MATCH ---
+        // If the reply address matches the one defined for our active target ID
+        if (rx_msg_header.ExtId == single_uds_params_array[currentId].replyId) {
 
-					if(maxHold_enabled){
-						if(isnan(dashboardParamCouple[currentParamElementSelection])){
-							dashboardParamMaxHold[currentParamElementSelection]=tmpVal2; //first update after navigation: reset max hold
-						}else if(tmpVal2 > dashboardParamMaxHold[currentParamElementSelection]){
-							dashboardParamMaxHold[currentParamElementSelection]=tmpVal2; //new maximum found
-						}
-						dashboardParamCouple[currentParamElementSelection]=dashboardParamMaxHold[currentParamElementSelection];
-					}else{
-						dashboardParamCouple[currentParamElementSelection]=tmpVal2; //normal behavior
-					}
-					sendDashboardPageToSlaveBaccable();//send parameters to BH
-				}
-			}
-		}
+            // --- 3. DATA EXTRACTION ---
+            uint8_t offset = single_uds_params_array[currentId].replyOffset;
+            uint8_t len    = single_uds_params_array[currentId].replyLen;
+
+            // Boundary Check for DLC
+            if (rx_msg_header.DLC >= 4 + offset + len) {
+                onboardLed_blue_on();
+
+                uint8_t bytesToRead = (len > 4) ? 4 : len;
+                uint32_t tmpVal = 0;
+
+                // Build raw value from received bytes (Gucho's logic)
+                for (size_t i = 0; i < bytesToRead; i++) {
+                    tmpVal |= ((uint32_t)rx_msg_data[4 + offset + i]) << (8 * (bytesToRead - 1 - i));
+                }
+
+                // --- 4. CALCULATION & STORAGE ---
+                tmpVal += single_uds_params_array[currentId].replyValOffset;
+                float finalVal = (float)tmpVal * single_uds_params_array[currentId].replyScale;
+                finalVal += single_uds_params_array[currentId].replyScaleOffset;
+
+                // --- 5. INTEGRATED MAX HOLD LOGIC (Netzmark Dynamic Core Adaptation) ---
+                if (maxHold_enabled) {
+                    // Check if cache is empty or if we found a new maximum for this specific UDS ID
+                    if (isnan(uds_values_cache[currentId]) || finalVal > uds_values_cache[currentId]) {
+                        uds_values_cache[currentId] = finalVal; // New maximum found, update cache directly
+                    }
+                } else {
+                    // Normal behavior: Update the "Fridge" (Cache) with current live value
+                    uds_values_cache[currentId] = finalVal;
+                }
+            }
+        }
+    }
+}
+/* @netzmark: END */
+		
 		/*
 		if(seatbeltAlarmDisabled==0xfe){ //if seatbelt status acquisition is in progress
 			if(rx_msg_header.ExtId==0x18DAF160){ //if received message comes from IPC
@@ -455,7 +516,7 @@ void processingExtendedMessage(){
 				DynoStateMachineLastUpdateTime=currentTime;//save last time it was updated
 			}
 		}
-	#endif
+	#endif  //end define C2
 
 
 }

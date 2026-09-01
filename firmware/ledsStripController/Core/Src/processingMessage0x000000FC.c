@@ -28,9 +28,13 @@ void processingMessage0x000000FC(){
 		// @netzmark: used by PDC DISABLE code (pdcAutoDisable)
 		// Reverse gear on C2 detection
 		if(rx_msg_header.DLC >= 4) {
-			//bitmask fix 28/08/2026 - was &&, the logical AND: it collapsed the 2 bit field to 0 or 1 and left the
-			//upper bits of the shifted byte unmasked, so any of bits 2..7 being set read as "reverse engaged".
-			reverseGearActive=(rx_msg_data[3]>>2) & 0b00000011; //0=not inserted, 1=rear gear engaged, 2=not used
+			if(rx_msg_data[3] == 0x06) {
+				reverseGearActive = 1; // Reverse gear driving
+				//onboardLed_blue_on();
+			} else {
+				reverseGearActive = 0; // Forward driving or parking post
+				//onboardLed_blue_off();
+			}
 		}
 		// @netzmark - end
 	#endif

@@ -243,6 +243,9 @@ const char *FW_VERSION=_FW_VERSION;
 	uint8_t dashboardPageIndex=0; //to send message index - it changes when you press cruise control buttons
 	uint32_t last_sent_uds_parameter_request_Time=0; //stores last time we send a uds parameter request
 
+	uint8_t last_41A_raw_data[8]={0};	// stores entire 41A frame data, @netzmark - to cheat IBS
+	volatile uint8_t new_41A_flag=0;	// info that 41A has been refreshed, @netzmark - to cheat IBS
+
 	uint8_t dieselEngineRegenerationMode=0; //0=None, 1=DPF_REGEN_LO, 2=DPF_REGEN_HI, 3=NSC_DE_NOX_REGEN, 4=NSC_DE_SOX_REGEN, 5=SCR_HEATUP_STRATEGY
 
 	//
@@ -357,6 +360,7 @@ const char *FW_VERSION=_FW_VERSION;
 	uint32_t lastSentAutostartMsg=0;
 	uint8_t AutostartMsgCounter=0;
 	uint8_t brakeIntervention_ACC_ESC_ASR=0; //tells if brake is pressed
+	volatile uint8_t autostartActiveBurst=0; //@netzmark Autostart improvement
 
 	//CLOSE_WINDOWS
 	uint8_t function_close_windows_with_door_lock=0; //0=disabled, 1=close windows1, 2=close windows2
@@ -447,18 +451,18 @@ const char *FW_VERSION=_FW_VERSION;
 	CAN_TxHeaderTypeDef rearBrakeMsgHeader[4]={{.IDE=CAN_ID_EXT, .RTR = CAN_RTR_DATA, .ExtId=0x18DA28F1, .DLC=5},{.IDE=CAN_ID_EXT, .RTR = CAN_RTR_DATA, .ExtId=0x18DA28F1, .DLC=8},{.IDE=CAN_ID_EXT, .RTR = CAN_RTR_DATA, .ExtId=0x18DA28F1, .DLC=3},{.IDE=CAN_ID_EXT, .RTR = CAN_RTR_DATA, .ExtId=0x18DA28F1, .DLC=3}};
 	uint8_t rearBrakeMsgData[4][8]= {{0x04, 0x2F, 0x5A, 0xBD, 0x00,},{0x07, 0x2F, 0x5A, 0xBD, 0x03, 0x27, 0x10, 0x03},{0x02, 0x3E, 0x80,},{0x02, 0x10, 0x40,}}; //from last to first we have: diag session, tester present, IO Control - Short Term Adjustment(disable front brakes) (periodic)
 
-	uint8_t reverseGearActive  =0; //0=not inserted, 1=rear gear engaged, 2=not used
+	//uint8_t reverseGearActive  =0; //0=not inserted, 1=rear gear engaged, 2=not used
 	uint8_t parkSensorsFunctionStatus=0; //0=off, 1=ON active, 2=ON inactive, 3=ON disabled
 	uint8_t parkSensorsLedStatus; //0=off, 1=continuous, 2=blink
 
-	// @netzmark PDC auto disable - see functions_C2baccable.c
-	volatile uint8_t  pdc_is_beeping     = 0; //1=front sensors in alarm (from 0x3E7)
-	volatile uint8_t  pdc_auto_disabled  = 0; //1=the park sensors are off because WE switched them off
-	volatile uint8_t  requestToTogglePDC = 0; //1=a button press has to be simulated
-	volatile int      pdc_send_counter   = 0; //0=nothing in progress, 1=button pushed, waiting to release it
-	volatile uint32_t last_pdc_shot_time = 0; //when the push was sent
-	uint8_t pdcMsgData[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-	CAN_TxHeaderTypeDef pdcMsgHeader={.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x5B0, .DLC = 8};
+//	// @netzmark PDC auto disable - see functions_C2baccable.c
+//	volatile uint8_t  pdc_is_beeping     = 0; //1=front sensors in alarm (from 0x3E7)
+//	volatile uint8_t  pdc_auto_disabled  = 0; //1=the park sensors are off because WE switched them off
+//	volatile uint8_t  requestToTogglePDC = 0; //1=a button press has to be simulated
+//	volatile int      pdc_send_counter   = 0; //0=nothing in progress, 1=button pushed, waiting to release it
+//	volatile uint32_t last_pdc_shot_time = 0; //when the push was sent
+//	uint8_t pdcMsgData[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+//	CAN_TxHeaderTypeDef pdcMsgHeader={.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x5B0, .DLC = 8};
 
 #endif
 
@@ -641,5 +645,31 @@ uint8_t usbConnectedToSlave=0; //tells if usb port is connected to BH or C2
 uint8_t usbConnectedToC2=0; //sniffer function 24/08/2026 - on C1: tracked per slave, see globalVariables.h
 uint8_t usbConnectedToBH=0; //sniffer function 24/08/2026
 
+// @netzmark PDC code - begin
+//PDC_AUTO_DISABLE
+#if defined(C2baccable)
+	volatile uint8_t pdc_state_disabled	 = 0; // 0 = PDC enabled, 1 = PDC disabled (LED off)
+	volatile uint8_t pdc_is_beeping   	 = 0; // 1 = sensors in alarms
+	volatile uint8_t pdc_auto_disabled 	 = 0; // 1 = PDC was disabled with our procedure
+	volatile uint8_t  requestToTogglePDC = 0;
+	volatile uint8_t  reverseGearActive  =0; //used on CAN C2 only
+	uint8_t pdcMsgData[8]={0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	CAN_TxHeaderTypeDef pdcMsgHeader={.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x5B0, .DLC = 8};
+	volatile int pdc_send_counter=0;
+	volatile uint32_t last_pdc_shot_time = 0;
+	volatile uint8_t vehicle_is_moving = 0; // in default "car not moving"
+#endif
+// @netzmark PDC code - end
 
+// @netzmark MUTE_ON_REVERSE code - begin
+//MUTE_ON_REVERSE
+#if defined(BHbaccable)
+	volatile uint8_t audioSystemMuted = 0;          // 0 = play, 1 = muted
+	uint8_t audioSystemReverseMuted = 0;            // Main loop state machine rigger
+	volatile uint8_t centerConsoleRxMsgData[6] = {0x0F, 0x7F, 0x80, 0x00, 0x00, 0x00}; // audio panel and volume status
+	uint8_t centerConsoleTxMsgData[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	CAN_TxHeaderTypeDef centerConsoleTxMsgHeader = {.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x358, .DLC = 6};
+	uint32_t exitReverseAudioTime = 0;
+#endif
+//@netzmark MUTE_ON_REVERSE code - end
 

@@ -153,10 +153,34 @@ void processingStandardMessage(){
 
 			#endif
 			break;
+
+			//@netzmark 0x116 test
 		case 0x00000116:
-			//byte 0..3 = wheel rotation pulse counters (0=leftFront, 1=rightFront, 2=leftRear, 3=rightRear)
-			//byte 4 = rotation status, 2 bits per wheel (0=steady, 1=forward, 2=backward, 3=undefined/spinning)
-			break;
+		    #if defined(C2baccable)
+		        static uint8_t previous_D0 = 0;
+		        static uint8_t is_first_run = 1;
+		        static uint32_t last_change_time = 0;
+
+		        if (is_first_run) {
+		            previous_D0 = rx_msg_data[0];
+		            is_first_run = 0;
+		        } else {
+		            if (rx_msg_data[0] != previous_D0) {
+		                last_change_time = currentTime;
+		                previous_D0 = rx_msg_data[0];
+		                vehicle_is_moving = 1;
+		            }
+
+		            if (vehicle_is_moving == 1 && (currentTime - last_change_time >= 300)) {
+		                vehicle_is_moving = 0;
+		            }
+		            if (vehicle_is_moving == 1) {
+		                onboardLed_red_on();
+		            }
+		        }
+		    #endif
+		    break;
+
 		case 0x00000192:
 			#if defined(C1baccable)
 					//if release button was pressed twice, toggle QV exhaust valve
@@ -212,39 +236,95 @@ void processingStandardMessage(){
 			//actual pedal position is on byte0 from bit 4 to 0 and byte 1 from bit7 to 5
 			//analog cluch is on byte 1 from bit 4 to 0 and byte 2 from bit 7 to 5.
 			break;
-		case 0x000001F5:
-			#if defined(C2baccable)
-				//PDC disable/enable logic - byte 4 is the brake pressure
-				if(parkSensorsMuteFunctionEnabled && rx_msg_header.DLC >= 5){
-					uint8_t currentPressure = rx_msg_data[4];
+//		case 0x000001F5:
+//			#if defined(C2baccable)
+//				//PDC disable/enable logic - byte 4 is the brake pressure
+//				if(parkSensorsMuteFunctionEnabled && rx_msg_header.DLC >= 5){
+//					uint8_t currentPressure = rx_msg_data[4];
+//
+//					//reverse gear: the car enables the PDC by itself, so the marker is no longer ours to hold
+//					if (reverseGearActive == 1 && pdc_auto_disabled == 1) {
+//						pdc_auto_disabled = 0;
+//					}
+//					//DISABLE: brake pressed firmly enough and the sensors are beeping. Not while in reverse.
+//					else if(currentPressure > 0x10) {
+//						if(reverseGearActive == 0 && pdc_is_beeping == 1 && pdc_auto_disabled == 0) {
+//							if (parkSensorsFunctionStatus != 0) { //park sensors currently on
+//								requestToTogglePDC = 1;
+//								pdc_auto_disabled = 1;
+//							}
+//						}
+//					}
+//					//ENABLE: brake released and the car is able to move again (not reverse, see the "if" above)
+//					else if(currentPressure < 0x10) { //separate threshold, so it can be tuned apart from the disable one
+//						if(pdc_auto_disabled == 1 && parkSensorsFunctionStatus == 0) { //we switched them off and they really are
+//							requestToTogglePDC = 1;
+//							pdc_auto_disabled = 0;
+//						}
+//						//the car put them back on by itself (speed exceeded): just drop the marker
+//						else if (pdc_auto_disabled == 1 && parkSensorsFunctionStatus != 0) {
+//							pdc_auto_disabled = 0;
+//						}
+//					}
+//				}
+//			#endif
+//			break;
 
-					//reverse gear: the car enables the PDC by itself, so the marker is no longer ours to hold
-					if (reverseGearActive == 1 && pdc_auto_disabled == 1) {
-						pdc_auto_disabled = 0;
-					}
-					//DISABLE: brake pressed firmly enough and the sensors are beeping. Not while in reverse.
-					else if(currentPressure > 0x10) {
-						if(reverseGearActive == 0 && pdc_is_beeping == 1 && pdc_auto_disabled == 0) {
-							if (parkSensorsFunctionStatus != 0) { //park sensors currently on
-								requestToTogglePDC = 1;
-								pdc_auto_disabled = 1;
-							}
-						}
-					}
-					//ENABLE: brake released and the car is able to move again (not reverse, see the "if" above)
-					else if(currentPressure < 0x10) { //separate threshold, so it can be tuned apart from the disable one
-						if(pdc_auto_disabled == 1 && parkSensorsFunctionStatus == 0) { //we switched them off and they really are
-							requestToTogglePDC = 1;
-							pdc_auto_disabled = 0;
-						}
-						//the car put them back on by itself (speed exceeded): just drop the marker
-						else if (pdc_auto_disabled == 1 && parkSensorsFunctionStatus != 0) {
-							pdc_auto_disabled = 0;
-						}
-					}
-				}
-			#endif
-			break;
+			// ID: 0x000001F5 - PDC disable/enable logic
+			// requestToTogglePDC is placed in functions_C2baccable.c
+		case 0x000001F5:
+		#if defined(C2baccable)
+			if(rx_msg_header.DLC >= 5){
+			    uint8_t currentPressure = rx_msg_data[4];
+
+			    // =========================================================================
+			    // --- Automated PDC disabler marker reseted ---
+			    // when Reverse gear is selected the car automatically enables disabled PDC system
+			    // =========================================================================
+			    if (reverseGearActive == 1 && pdc_auto_disabled == 1) {
+			        pdc_auto_disabled = 0;
+			        //onboardLed_blue_off();
+			    }
+			    // =========================================================================
+			    // --- DISABLE PDC ---
+			    // disable front PDC if the brake is pressed firmly enough and PDC system has detected something
+			    // we don't do it when the Reverse gear is selected
+			    // =========================================================================
+			    else if(currentPressure > 0x10) {
+			        if(reverseGearActive == 0 && pdc_is_beeping == 1 && pdc_auto_disabled == 0) {
+				        if (pdc_state_disabled == 0) {
+			                requestToTogglePDC = 1;
+			                pdc_auto_disabled = 1;
+			                //onboardLed_blue_on();
+			            }
+			        }
+			    }
+			    // =========================================================================
+			    // --- ENABLE PDC ---
+			    // re-enable front PDC if the brake is released and the car is able to make any move
+			    // =========================================================================
+			    else if(currentPressure < 0x10) { //I have left this threshold here to have ability to react on other level than for disable
+			        // we know it is not reverse Gear because of "if" of the function)
+			        // --- ENABLE PDC (if it was disabled automatically and the PDC system is really OFF)
+			        if(pdc_auto_disabled == 1 && pdc_state_disabled == 1) {
+			            requestToTogglePDC = 1;
+			            pdc_auto_disabled = 0;
+			            //onboardLed_blue_off();
+			        }
+			        // --- AUTOMATED PDC MARKER RESET (if the car enabled PDC automatically due to speed exceeding)
+			        else if (pdc_auto_disabled == 1 && pdc_state_disabled == 0) {
+			            pdc_auto_disabled = 0;
+			            //onboardLed_blue_off();
+			        }
+			    }
+			}
+		#endif
+		break;
+		//	// =========================================================================
+		//	// TOGGLE PDC SHOT (requestToTogglePDC) placed in functions_C2baccable.c
+		//	// =========================================================================
+			// @netzmark PDC auto disabler code - end
+		
 		case 0x0000001F7:
 			#if defined(C1baccable)
 				if(rx_msg_header.DLC>=4){
@@ -361,6 +441,16 @@ void processingStandardMessage(){
 		   break;
 		case 0x00000358:
 			//should contain volume position (number of ticks in byte2, and direction in byte 2, bit 6 and 5)
+
+			// @netzmark MUTE_ON_REVERSE code - begin
+		   #if defined(BHbaccable)
+		    if(rx_msg_header.DLC >= 6) {
+				// Capture pure radio background to separate buffer
+		    	memcpy((uint8_t*)centerConsoleRxMsgData, rx_msg_data, 6);
+			 }
+			#endif
+			// @netzmark MUTE_ON_REVERSE code - end
+
 			break;
 		case 0x00000384:
 			processingMessage0x00000384();
@@ -375,16 +465,32 @@ void processingStandardMessage(){
 
 			#endif
 			break;
-		case 0x000003E7: //PDC Alarms status (front sensors beeping)
-			#if defined(C2baccable)
-				//byte 0: 0x00 = no alarms, 0x40 = some alarm at the front (or reverse gear, not served while in R)
-				if(rx_msg_header.DLC >= 6){
-					pdc_is_beeping = (rx_msg_data[0] > 0x00) ? 1 : 0;
-							}
-				//byte 1 bits 4-0 + byte 2 bits 7-4 = obstacle distances: bits 0-2 front right, 3-5 front left,
-				//6-8 front central (0=none, 1=far, 2=near; the central one goes up to 6)
-			#endif
+//		case 0x000003E7: //PDC Alarms status (front sensors beeping)
+//			#if defined(C2baccable)
+//				//byte 0: 0x00 = no alarms, 0x40 = some alarm at the front (or reverse gear, not served while in R)
+//				if(rx_msg_header.DLC >= 6){
+//					pdc_is_beeping = (rx_msg_data[0] > 0x00) ? 1 : 0;
+//							}
+//				//byte 1 bits 4-0 + byte 2 bits 7-4 = obstacle distances: bits 0-2 front right, 3-5 front left,
+//				//6-8 front central (0=none, 1=far, 2=near; the central one goes up to 6)
+//			#endif
+//			break;
 
+			// ID: 0x000003E7 - PDC Alarms status (front sensors beeping
+		case 0x000003E7:
+			#if defined(C2baccable)
+				if(rx_msg_header.DLC >= 6){
+					// Check Byte 2 and Byte 3 for sound status (0x0A and 0xAA means total "silence" on PDC sensors)
+					//if(rx_msg_data[4] > 0x01 && rx_msg_data[5] > 0x00){ //typically 0x0100 means no alarms, and changes if some alarms at the front side
+					if(rx_msg_data[0] > 0x00){ //typically 0x00 means no alarms, and 0x40 means some alarms (or Reverse gear but we don't serve it while R)
+						pdc_is_beeping = 1;
+						//onboardLed_red_on();
+					} else {
+						pdc_is_beeping = 0;
+						//onboardLed_red_off();
+					}
+				}
+			#endif
 			break;
 		case 0x000003E8:
 			#if defined(BHbaccable)
@@ -422,6 +528,10 @@ void processingStandardMessage(){
 					batteryCurrent= (rx_msg_data[4] << 4 | (rx_msg_data[5] >> 4)); //just for test, we try another message 0x41E
 					nativeMaxHoldUpdate(3); //battery state of charge  //even if no more used
 					nativeMaxHoldUpdate(4); //battery current //just for test commented, to use another message 0x41E
+				
+					//  @netzmark - to cheat IBS
+					memcpy(last_41A_raw_data, rx_msg_data, 8);
+					new_41A_flag = 1;
 				}
 			#endif
 			//battery state of charge is on byte 1 from bit 6 to 0 (Percentage)
@@ -552,14 +662,30 @@ void processingStandardMessage(){
 			//only if lights are OFF, and therefore the dashboard is set to min brightness: setting byte 5 to 0xF0, the brightness reduces for around 100msec (this works for any value between Dx and Fx)
 			//this is the test message to increase brightness: 0x88 0x20 0xC3 0x24 0x00 0x14 0x30 0x00
 			break;
-		case 0x0000054A: // Panel PDC Button/LED Status
-			#if defined(C2baccable)
-				if(rx_msg_header.DLC >= 4){
-					parkSensorsFunctionStatus=rx_msg_data[1] & 0b00000011; //0=off, 1=ON active, 2=ON inactive, 3=ON disabled
-					parkSensorsLedStatus=(rx_msg_data[3]>>6) & 0b00000011; //0=off, 1=continuous, 2=blink
-				}
-			#endif
-			break;
+//		case 0x0000054A: // Panel PDC Button/LED Status
+//			#if defined(C2baccable)
+//				if(rx_msg_header.DLC >= 4){
+//					parkSensorsFunctionStatus=rx_msg_data[1] & 0b00000011; //0=off, 1=ON active, 2=ON inactive, 3=ON disabled
+//					parkSensorsLedStatus=(rx_msg_data[3]>>6) & 0b00000011; //0=off, 1=continuous, 2=blink
+//				}
+//			#endif
+//			break;
+
+			// @netzmark PDC DISABLE code (pdcAutoDisable)- begin
+			// ID: 0x0000054A - Panel PDC Button/LED Status
+			case 0x0000054A:
+				#if defined(C2baccable)
+					if(rx_msg_header.DLC >= 4){
+						if(rx_msg_data[3] == 0x40) {
+							pdc_state_disabled = 1; // LED ON - PDC disabled
+							//onboardLed_red_on();
+						} else {
+							pdc_state_disabled = 0; // LED OFF - PDC enabled
+							//onboardLed_red_off();
+						}
+					}
+				#endif
+				break;
 		case 0x000005A0:
 			#if defined(BHbaccable)
 
@@ -781,6 +907,19 @@ void processingStandardMessage(){
 			#endif
 			//the park assistant button press event is on byte 1 bit 5 (1=pressed)
 			break;
+		//@netzmark MUTE_ON_REVERSE code - end
+		case 0x000005BE:
+			#if defined(BHbaccable)
+				if(rx_msg_header.DLC >= 1) {
+					if(rx_msg_data[0] == 0x30) {
+						audioSystemMuted = 1; // Radio is muted / paused
+					} else if(rx_msg_data[0] == 0x10) {
+						audioSystemMuted = 0; // Radio is playing music
+					}
+				}
+			#endif
+			break;
+		//@netzmark MUTE_ON_REVERSE code - end			
 		case 0x000005CA:
 			#if defined(BHbaccable)
 			//clima left temperature setpoint is on byte 4 and byte 5 from bit 7 to  6 (from value 0 to 1023)

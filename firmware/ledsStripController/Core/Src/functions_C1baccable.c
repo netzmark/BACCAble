@@ -5,13 +5,31 @@
  *      Author: GauchoHP
  *      Common functions for C1baccable
  */
-#include <functions_C1baccable.h>
-
+#include "functions_C1baccable.h" 	//<> changed by @netzmark
+#include "functions_Common.h" 		// added by @netzmark
+ 
 	extern uint32_t _end;      // Fine della sezione .bss (fornito dal linker)
 	extern uint32_t _estack;   // Top dello stack (fornito dal linker)
 	//uint8_t tmpArr3[2]={C2BusID,C2cmdRaceMaskDefault};
-
+ 
+	/* @netzmark: to create multi parameters screens */
+#include "uds_parameters.h"
+	/* @netzmark: END */
+ 
 #if defined(C1baccable)
+ 
+	/* @netzmark: to create multi parameters screens */
+#if defined(C1baccable)
+    uint32_t lastDisplayUpdateTime = 0;
+    uint16_t dynamicInterval = 500;
+    uint8_t  group_step = 0;
+    uint8_t  actuallyRequestedUdsId = 0;
+    uint8_t  requestedId = 0;
+    uint8_t  idLeft = 0;
+    uint8_t  idRight = 0;
+#endif
+    /* @netzmark: END */
+ 
 	void C1baccableInitCheck(){
 		#ifndef DISABLE_LOW_CONSUME
 			lowConsume_init();
@@ -34,7 +52,7 @@
 		function_read_faults_enabled=(uint8_t)readFromFlash(15);
 		function_is_diesel_enabled=(uint8_t)readFromFlash(16);
 		total_pages_in_params_setup_dashboard_menu = function_is_diesel_enabled ? total_pages_in_dashboard_menu_diesel : total_pages_in_dashboard_menu_gasoline;
-
+ 
 		function_regeneration_alert_enabled=(uint8_t)readFromFlash(17);
 		launch_torque_threshold= (uint16_t)readFromFlash(18);
 		function_seatbelt_alarm_enabled= (uint16_t)readFromFlash(19);
@@ -65,13 +83,13 @@
 		//arise trigger to notify enabled functions to slave boards with dedicated messages,after some seconds
 		allProcessorsWakeupTime=currentTime;
 		instructSlaveBoardsTriggerEnabled=1;
-
+ 
 		readShownParamsFromFlash();
 	}
-
+ 
 	void setSchizzaforteMap(uint8_t map){
 		uint8_t tmpArr0[UART1_BUFFER_SIZE]={'#',0xb6,};
-
+ 
 		// Schizzaforte Operative commands:
 		//				First Character: #
 		//				Second Character:	0x00=set Bypass map, 0x49=set All weather map, 0x92=set Natural map, 0xdb=set Dynamic map,
@@ -86,11 +104,11 @@
 		//													8)polynomialcurve[][4]
 		//													9)checksum (calculated)
 		// Current selected Map is sent as Reply: 0x10=Bypass, 0x59=All weather, 0xa2=Natural, 0xeb=Dynamic, 0x34=Race
-
+ 
 		//map: 2=Bypass, 3=All Weather Map, 4=Natural Map, 5=Dynamic Map, 6=Race Map
-
-
-
+ 
+ 
+ 
 		switch(map){
 			case 3: //A map
 				//prepare power amplification factor
@@ -100,7 +118,7 @@
 				}else{
 					pedal_map_power_adapted = (int8_t)(pedal_map_power * 0.6f-0.5f);
 				}
-
+ 
 				tmpArr0[2]=0x49;	//A map
 				tmpArr0[3]=96+pedal_map_power_adapted;	//amplitude
 				tmpArr0[4]=128;		//width
@@ -114,7 +132,7 @@
 				} else {
 					pedal_map_power_adapted = (int8_t)(pedal_map_power * 1.6f - 0.5f);
 				}
-
+ 
 				tmpArr0[2]=0x92;
 				tmpArr0[3]=128+pedal_map_power_adapted;		//amplitude
 				tmpArr0[4]=128;		//width
@@ -151,15 +169,15 @@
 				tmpArr0[2]=0x00;
 				break;
 		}
-
+ 
 		tmpArr0[8]=calculateCRC(tmpArr0,UART1_BUFFER_SIZE); //calculate checksum
-
+ 
 		//send message
 		addToUART1SendQueue(tmpArr0, 9);
-
+ 
 	}
-
-
+ 
+ 
 	//elm327 function 26/08/2026 - BEGIN
 	//Only ram is touched here, so this is safe from anywhere: bringing usb up blocks for a few milliseconds and
 	//is deferred to elm327UsbStartIfRequested(), exactly like snifferStart() does.
@@ -169,7 +187,7 @@
 		elm327ActivationTime=currentTime;	//starts the host detection window (SNIFFER_ACTIVATION_TIMEOUT_MS)
 		elm327UsbStartRequested=1;
 	}
-
+ 
 	//Leaves the mode for good: interpreter off, bridge disarmed on all three chips, usb port down.
 	//elm327_set_enabled(0) does all of that (see elm327.c), including usb_device_detach().
 	void elm327Stop(void){
@@ -190,14 +208,14 @@
 		allProcessorsWakeupTime=currentTime;
 		instructSlaveBoardsTriggerEnabled=1;
 	}
-
+ 
 	//Brings the usb port up. Called from the main loop only: usb_device_attach() waits on HAL_Delay().
 	void elm327UsbStartIfRequested(void){
 		if(elm327UsbStartRequested==0) return;
 		elm327UsbStartRequested=0;
 		usb_device_attach(); //idempotent, and it selects the elm327 descriptors on its own
 	}
-
+ 
 	//Called every main loop iteration while the function is on. Mirrors snifferCheckActivationTimeout(), but
 	//the interpreter is switched on only once a host has really enumerated us: until then the baccable must
 	//keep working normally, because turning ELM327 on freezes the dashboard and takes over the serial line.
@@ -215,14 +233,97 @@
 		elm327Stop(); //host never showed up, or went away: back to being a plain baccable
 	}
 	//elm327 function 26/08/2026 - END
-
+ 
 	void C1baccablePeriodicCheck(){
 		#ifndef DISABLE_LOW_CONSUME
 			lowConsume_process();
 		#endif
-
+ 
+		/*  @netzmark - to cheat IBS */
+		static uint8_t function_ibs_cheat_enabled = 1; //to test the function only
+		//if(function_ibs_cheat_enabled) {
+		if(function_ibs_cheat_enabled) {
+		    enum {
+		        battery_soc_min      = 75,//75
+		        battery_soc_forced   = 75,//75
+		        battery_soc_max      = 98,
+		        speed_start_cheating = 30,
+		        speed_stop_cheating  = 25
+		    };
+ 
+		    static uint8_t ibs_cheat_active  = 0;
+		    static uint32_t lastSentIBS_spoof = 0;
+		    static uint8_t spoof_retry_count = 0;
+		    static uint8_t forced_soc_data[7];
+ 
+		    // Static header to avoid re-initializing every 2ms loop
+		    static CAN_TxHeaderTypeDef tx_header;
+		    tx_header.StdId = 0x41A;
+		    tx_header.IDE   = CAN_ID_STD;
+		    tx_header.RTR   = CAN_RTR_DATA;
+		    tx_header.DLC   = 7; // Corrected DLC from sniffer
+		    tx_header.TransmitGlobalTime = DISABLE;
+ 
+		    // 1. HYSTERESIS LOGIC: Speed-based activation
+//		    if (currentSpeed_km_h > speed_start_cheating) {
+//		        ibs_cheat_active = 1;
+//		    } else if (currentSpeed_km_h < speed_stop_cheating) {
+//		        ibs_cheat_active = 0;
+//		        spoof_retry_count = 0; // Stop any pending spoofing
+//		    }
+ 
+		    //to remove after tests
+            if (requestedId == 252) {
+                ibs_cheat_active = 1;
+            } else if (requestedId != 252) {
+                ibs_cheat_active = 0;
+                spoof_retry_count = 0; // Immediate stop when switching menu
+            }
+            //to remove after tests - END
+ 
+		    // 2. TRIGGER: When a new original frame is received (approx. every 100ms)
+		    if (new_41A_flag) {
+		        new_41A_flag = 0;
+ 
+		        // Check activation conditions
+		        if (ibs_cheat_active &&
+		            batteryStateOfCharge >= battery_soc_min &&
+		            batteryStateOfCharge < battery_soc_max) {
+ 
+		            // Clone the original 7 bytes to keep temp, current, etc.
+		            memcpy(forced_soc_data, (void*)last_41A_raw_data, 7);
+ 
+		            // MODIFICATION: Inject forced SoC while preserving original Status Bit (MSB)
+		            forced_soc_data[1] = (last_41A_raw_data[1] & 0x80) | (uint8_t)battery_soc_forced;
+ 
+		            // MODIFICATION type2: Inject forced SoC with setting on the Status Bit (MSB)
+		            //forced_soc_data[1] = 0x80 | (uint8_t)battery_soc_forced;
+ 
+		            // Trigger the sequence: send spoof frame in the next 5 loop cycles (~10ms)
+		            // This is more effective than a tight for-loop for overriding ECU memory
+		            spoof_retry_count = 10;
+		        }
+		    }
+ 
+		    // 3. EXECUTION: Send one spoof frame per loop cycle if counter is active
+		    if (spoof_retry_count > 0) {
+		        // @netzmark: Use currentTime to ensure 3ms gap between spoof frames
+		        if (currentTime - lastSentIBS_spoof >= 3) {
+ 
+		            if (can_tx(&tx_header, forced_soc_data) == HAL_OK) {
+		                spoof_retry_count--;
+		                lastSentIBS_spoof = currentTime; // Update timer after successful send
+		            }
+		            //onboardLed_red_on();
+		        }
+		    } else {
+		        //onboardLed_red_off();
+		    }
+		}
+//		/*  @netzmark - END */
+ 
 		if(QV_exhaust_flap_function_enabled){
-
+ 
 			// Timeout management for chinese valves radiocontrol
 			if (exhaustValveMosfetCommandTime) {
 				if(currentTime - exhaustValveMosfetCommandTime > 1000){ //if timeout has passed
@@ -231,7 +332,7 @@
 					exhaustValveMosfetCommandTime = 0;
 				}
 			}
-
+ 
 			// if a request to press the button on the radiocontrol was made
 			if (ChineseExhaustValveRequest){ //O=open, C=close, 0x00=none
 			    HAL_GPIO_WritePin(Q10mosfet_Port,(ChineseExhaustValveRequest == 'O') ? Q10mosfet_Pin : Q11mosfet_Pin,GPIO_PIN_SET); //close transistor (press button)
@@ -239,15 +340,15 @@
 			    exhaustValveMosfetCommandTime = currentTime; //store time when button was pressed
 			    ChineseExhaustValveRequest = 0; //mark the request as executed
 			}
-
+ 
 			// if valve was open and engine had been shutted off
 			if (chineseValveIsOpened && currentRpmSpeed == 0){
 			    HAL_GPIO_WritePin(Q11mosfet, GPIO_PIN_SET); //close transistor
 			    exhaustValveMosfetCommandTime = currentTime; //store time when button was pressed
 			    chineseValveIsOpened = 0; //update valves status
 			}
-
-
+ 
+ 
 			switch(ForceQVexhaustValveOpened){
 				case 1: //send connection request
 				case 2: //send presence
@@ -273,15 +374,15 @@
 							default:  //we will never come here
 								break;
 						}
-
+ 
 					}
 					break;
 				default: //do nothing
 					break;
 			}
-
+ 
 		}
-
+ 
 		if(ESCandTCinversion){
 			if(currentRpmSpeed==0) ESCandTCinversion=0;
 			if((currentTime-lastSent384)>50){
@@ -294,48 +395,48 @@
 				can_tx((CAN_TxHeaderTypeDef *)&DNA_msg_header, DNA_msg_data); //transmit the modified packet
 			}
 		}
-
-
+ 
+ 
 		if(instructSlaveBoardsTriggerEnabled){
 			if((currentTime-allProcessorsWakeupTime)>TIMING__C1____DELAY_BEFORE_SERIAL_INSTRUCT_OF_C2BH_AFTER_OTHER_CHIP_WAKE_MS){
 				//onboardLed_red_blink(5);
 				instructSlaveBoardsTriggerEnabled=0; //avoid to return here
-
-
+ 
+ 
 				//send messages to slave boards
 				uint8_t tmpArr0[2]={C2_Bh_BusID,C2_Bh_cmdFunction_ESC_TC_Enabled};
 				if(!function_esc_tc_customizator_enabled) tmpArr0[1]=C2_Bh_cmdFunction_ESC_TC_Disabled;
 				addToUARTSendQueue(tmpArr0, 2);
-
+ 
 				//send messages to slave boards
 				uint8_t tmpArr1[3]={C2_Bh_BusID,C2_Bh_cmdSetPedalBoostStatus,function_pedal_booster_enabled};
 				addToUARTSendQueue(tmpArr1, 3);
-
+ 
 				//send the message to BH to inform about the status of the function disable_odometer_blink
 				uint8_t tmpArr2[2]={BhBusID,BHcmdOdometerBlinkDefault};
 				if(function_disable_odometer_blink) tmpArr2[1]=BHcmdOdometerBlinkDisable;
 				addToUARTSendQueue(tmpArr2, 2);
-
+ 
 				//Now let's inform the C2 Baccable
 				uint8_t tmpArr3[2]={C2BusID,C2cmdRaceMaskDefault};
 				if(function_show_race_mask) tmpArr3[1]=C2cmdShowRaceMask;
 				addToUARTSendQueue(tmpArr3, 2);
-
+ 
 				//Now let's inform the BH Baccable
 				uint8_t tmpArr4[2]={BhBusID,BHcmdFunctParkMirrorDisabled};
 				if(function_park_mirror) tmpArr4[1]=BHcmdFunctParkMirrorEnabled;
 				addToUARTSendQueue(tmpArr4, 2);
-
+ 
 				//notify to C2 and BH HAS function status
 				uint8_t tmpArr5[2]={C2_Bh_BusID,C2_Bh_cmdFunctHAS_Disabled};
 				if(HAS_function_enabled) tmpArr5[1]=C2_Bh_cmdFunctHAS_Enabled;
 				addToUARTSendQueue(tmpArr5, 2);
-
+ 
 				//notify to C2 the park sensors mute function status
 				uint8_t tmpArr6[2]={C2BusID,C2cmdFunctParkSensorsMuteDisabled};
 				if(parkSensorsMuteFunctionEnabled) tmpArr6[1]=C2cmdFunctParkSensorsMuteEnabled;
 				addToUARTSendQueue(tmpArr6, 2);
-
+ 
 				//notify to C2 and BH the sniffer function status //sniffer function 24/08/2026
 				uint8_t tmpArr7[2]={C2_Bh_BusID,C2_Bh_cmdSnifferDisabled};
 				if(snifferFunctionEnabled){
@@ -350,7 +451,7 @@
 				addToUARTSendQueue(tmpArr7, 2);
 			}
 		}
-
+ 
 		if(function_led_strip_controller_enabled==1){
 			//don't act as canable. One USB port pin is used to control leds.
 			vuMeterInit(); //initialize leds strip controller - this is called many times to divide the operations on more loops
@@ -361,7 +462,7 @@
 				}
 			}
 		}
-
+ 
 		if(function_4wd_disabler_enabled==1){
 			if(_4wd_disabled>0){
 				uint8_t tempDeltaTime=0;
@@ -374,7 +475,7 @@
 				}
 			}
 		}
-
+ 
 		if(executeDashboardBlinks>0){ //if we shall execute a blink to give a feedback to the user
 			if(currentTime-last_sent_dashboard_blink_msg_time>500){ //enter here once each halfsecond
 				last_sent_dashboard_blink_msg_time=currentTime;//return here after half second
@@ -390,8 +491,8 @@
 				can_tx(&dashboardBlinkMsgHeader, dashboardBlinkMsgData);
 			}
 		}
-
-
+ 
+ 
 		if(immobilizerEnabled){
 			//the following it is used only by IMMOBILIZER functionality
 			if(floodTheBus){ //WHEN THIS IS ACTIVATED, THE THIEF WILL NOT BE ABLE TO CONNECT TO RFHUB, AND CAR WILL NOT SWITCH ON.
@@ -399,7 +500,7 @@
 					can_tx(&panicAlarmStartMsgHeader[0], panicAlarmStartMsgData[0]); //sends the message on can bus that resets the connection to RFHUB
 					floodTheBusLastTimeSent=currentTime;
 				}
-
+ 
 				if(!panicAlarmActivated){ //if panic alarm is not activated, we shall activate it after 1 second (1 second to avoid stop and start simultaneous)
 					if(currentTime-floodTheBusStartTime>1000){
 						for (uint8_t i=0;i<15;i++){
@@ -418,16 +519,16 @@
 					can_tx(&panicAlarmStartMsgHeader[2], panicAlarmStartMsgData[2]);
 					panicAlarmActivated=0;
 				}
-
-
+ 
+ 
 			}
 		}
-
+ 
 		if(function_smart_disable_start_stop_enabled){
 			if(startAndStopEnabled){
 				if(currentTime>10000){ //first 10 seconds don't do anything to avoid to disturb other startup functions or immobilizer
 					if(engineOnSinceMoreThan5seconds>=500){ //if motor is on since at least 5 seconds
-
+ 
 						if(startAndstopCarStatus==0){//if start & stop was found disabled in car, we don't need to do anything. Avoid to enter here; We enter here in example if board is switched when the car is running and S&S was still manually disabled by the pilot
 							startAndStopEnabled=0;
 							requestToDisableStartAndStop=0;
@@ -440,12 +541,12 @@
 				}
 			}
 		}
-
+ 
 		/*
 		if(seatbeltAlarmDisabled==0xff ){ //if the status is unknown
 			if(engineOnSinceMoreThan5seconds>=200){ //if motor is on since at least 2 seconds
 				//get the status of the seatbelt alarm
-
+ 
 				uds_parameter_request_msg_header.ExtId=0x18DA60F1;
 				uds_parameter_request_msg_data[0]=0x03;
 				uds_parameter_request_msg_data[1]=0x22;
@@ -459,12 +560,12 @@
 			}
 		}
 		*/
-
+ 
 		if(((seatbeltAlarmDisabled==0xfe) || (seatbeltAlarmDisabled==0x10) || (seatbeltAlarmDisabled==0x20) || (seatbeltAlarmDisabled==0x11) || (seatbeltAlarmDisabled==0x21)) && (currentTime-seatbeltAlarmStatusRequestTime>10000)){ //if operations in progress but timeout was reached
 			seatbeltAlarmDisabled=0xff;//return to unknown status
 		}
-
-
+ 
+ 
 		if(((seatbeltAlarmDisabled==1) || (seatbeltAlarmDisabled==0xff) ) && (function_seatbelt_alarm_enabled==1)){ //the alarm is disabled (or unknown) and the use wants to enable it
 			if(engineOnSinceMoreThan5seconds>=200){
 				//request to enable Seatbelt Alarm
@@ -475,13 +576,13 @@
 				uds_parameter_request_msg_data[2]=0x03;
 				uds_parameter_request_msg_header.DLC=3;
 				can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data); //transmit the diag session request
-
+ 
 				seatbeltAlarmDisabled=0x20; //request to enable SeatBelt alarm in progress(send write param)
 				seatbeltAlarmStatusRequestTime=currentTime;
 				last_sent_uds_parameter_request_Time=currentTime;
 			}
 		}
-
+ 
 		if((seatbeltAlarmDisabled==0 || seatbeltAlarmDisabled==0xff)  && function_seatbelt_alarm_enabled==0){ //alarm is enabled (or unknown) and user wants to disable it
 			if(engineOnSinceMoreThan5seconds>=200){
 				//request to disable Seatbelt Alarm
@@ -492,16 +593,16 @@
 				uds_parameter_request_msg_data[2]=0x03;
 				uds_parameter_request_msg_header.DLC=3;
 				can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data); //transmit the diag session request
-
+ 
 				seatbeltAlarmDisabled=0x10; //request to disable SeatBelt alarm in progress(send write param)
 				seatbeltAlarmStatusRequestTime=currentTime;
 				last_sent_uds_parameter_request_Time=currentTime;
 			}
 		}
-
+ 
 		if(function_pedal_booster_enabled){ //if enabled, communicate with schizzaForte each 250msec
 			if(currentRpmSpeed<400) currentSchizzaforteMap='-'; //if engine is stopped. Forget the pedal map setting, so that baccable will be forced to set it again on schizzaforte
-
+ 
 			if(function_pedal_booster_enabled==8){ // Kids Limiter
 				// Independent check 1: ensure map A with minimum power is active (handles boot and any drift)
 				if(currentRpmSpeed>400 && currentSchizzaforteMap!='A'){
@@ -527,7 +628,7 @@
 				if(mapCommandNotApplied() && (currentRpmSpeed>400)){ //only if the map command was not correctly received and engine is on
 					if((currentTime - last_queued_serial_to_schizzaForte_msg_time)>(4 * TIMING__C1____SCHIZZAFORTE_SERIAL_TIMEOUT_REPLY_MS) ){
 						last_queued_serial_to_schizzaForte_msg_time=currentTime; //avoid to Return Here
-
+ 
 						if(function_pedal_booster_enabled==1){ // 1=Auto: set map according to DNA selector
 							//function_pedal_booster_enabled: 0=disabled, 1=Automatic Map, 2=Bypass, 3=All Weather Map, 4=Natural Map, 5=Dynamic Map, 6=Race Map, 7=Hybrid Align, 8=Kids Limiter
 							switch(currentDNAmode){
@@ -559,21 +660,21 @@
 				}
 			}
 		}
-
+ 
 		if(playMotorJingle){ //if  jingle was requested, check if we have to disable it
 			if(currentDNAmode!=0 || currentRpmSpeed< 400){ //engine off or drive style not Natural
 				playMotorJingle=0;
 			}
 		}
-
+ 
 		if(playMotorJingle){ //if we have to execute jingle
-
-
+ 
+ 
 			//once each 400msec play one note with the engine
 			if((currentTime - last_queued_serial_to_schizzaForte_msg_time)>(4 * TIMING__C1____SCHIZZAFORTE_SERIAL_TIMEOUT_REPLY_MS) ){
 				last_queued_serial_to_schizzaForte_msg_time=currentTime; //avoid to Return Here
 				//play it: force motor RPM for one time slot
-
+ 
 				// Schizzaforte Operative commands:
 				//				First Character: #
 				//				Second Character:	0x6d=get current Map, 0xb6=define a Map, 0xff=set accelerator percentage
@@ -595,17 +696,17 @@
 				//													8)0 //not used
 				//													9)checksum (calculated)
 				// Current selected Map is sent as Reply to any request: 0x10=Bypass, 0x59=All weather, 0xa2=Natural, 0xeb=Dynamic, 0x34=Race
-
+ 
 				uint8_t tmpArr0[UART1_BUFFER_SIZE]={'#',0xff,};
 				tmpArr0[2]=jingleArray[255-(playMotorJingle--)]; //set accelerator value from jingle array
 				tmpArr0[8]=calculateCRC(tmpArr0,UART1_BUFFER_SIZE); //calculate checksum
-
+ 
 				//send message
 				addToUART1SendQueue(tmpArr0, 9);
 			}
 		}
-
-
+ 
+ 
 		if(shutdownDashboardMenuRequestTime>0){
 			if(currentTime-shutdownDashboardMenuRequestTime>39000){
 				baccableDashboardMenuVisible=0; //stop sending params request when motor is off
@@ -616,10 +717,11 @@
 		}
 		//send a parameter request each xx msec if dashboard menu shall be visible
 		//baccableDashboardMenuVisible=1; //force menu always on, just for debug
+		/* ori Gaucho code end
 		if((currentTime-last_sent_uds_parameter_request_Time>500) && baccableDashboardMenuVisible ){
 			last_sent_uds_parameter_request_Time=currentTime;
-
-
+ 
+ 
 			switch(dashboard_menu_indent_level){
 				case 0: //main menu
 					sendMainDashboardPageToSlaveBaccable();
@@ -631,11 +733,11 @@
 						if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]== uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[!currentParamElementSelection]){
 							currentParamElementSelection=0; //single param
 						}
-
+ 
 						if(single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId>0xFF){ //if req id is greather than 0xFF it is a standard UDS request.
 							//request current parameter to ECU
 							uds_parameter_request_msg_header.ExtId=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqId;
-
+ 
 							memcpy(&uds_parameter_request_msg_data[0],&single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqData,single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen );
 							uds_parameter_request_msg_header.DLC=single_uds_params_array[uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[currentParamElementSelection]].reqLen;
 							//onboardLed_blue_on();
@@ -655,7 +757,7 @@
 							sendDashboardPageToSlaveBaccable();  //Send params to BH board
 						}
 					}
-
+ 
 					if(main_dashboardPageIndex==9){
 						sendSetupDashboardPageToSlaveBaccable();
 					}
@@ -684,7 +786,153 @@
 					break; //unexpected
 			}
 		}
+		*/
+ 
+/* @netzmark: to create multi parameters screens */
+if(baccableDashboardMenuVisible) {
+    switch(dashboard_menu_indent_level) {
+        case 0: // Main Menu
+            if (currentTime - last_sent_uds_parameter_request_Time >= 500) {
+                last_sent_uds_parameter_request_Time = currentTime;
+                sendMainDashboardPageToSlaveBaccable();
+            }
+            break;
+ 
+        case 1: // Parameters & Rotator Page
+            if(main_dashboardPageIndex == 1) {
+                clearFaultsRequest = 0;
+                uint16_t idToRequest = 0xFFFF;
+ 
+                // --- 1. GLOBAL SYNC ---
+                idLeft  = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[0];
+                idRight = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[1];
+ 
+                // --- 2. MODE DETERMINATION (Left rules & Safety Hack) ---
+                if (idLeft >= UDS_STOP_ID) {
+                    requestedId = idLeft; // Group Mode: Left Rules
+                } else if (idRight >= UDS_STOP_ID) {
+                    requestedId = idLeft; // Safety: Right is a Group but Left is not? Force Single Mode for Left.
+                    idRight = idLeft;     // Optional: Treat as Single Mode (33, 33)
+                } else {
+                    // Standard Couple/Single Mode
+                    requestedId = (idLeft > idRight) ? idLeft : idRight;
+                }
+ 
+                //Set Interval: 250ms for Groups, 500ms for Couple/Single
+                //dynamicInterval = (requestedId >= UDS_STOP_ID) ? 250 : 500;
+                dynamicInterval = 250;
+ 
+                // --- 2. DATA BRIDGE SYNC (The Fridge to Display) ---
+                if (idLeft < MAX_UDS_PARAMS) {
+                    float nativeVal = uds_values_cache[idLeft];
+                    if (maxHold_enabled) {
+                        if (isnan(dashboardParamCouple[0]) || nativeVal > dashboardParamCouple[0]) {
+                            dashboardParamCouple[0] = nativeVal;
+                        }
+                    } else {
+                        dashboardParamCouple[0] = nativeVal;
+                    }
+                }
+ 
+                if (idRight < MAX_UDS_PARAMS) {
+                    float nativeVal = uds_values_cache[idRight];
+                    if (maxHold_enabled) {
+                        if (isnan(dashboardParamCouple[1]) || nativeVal > dashboardParamCouple[1]) {
+                            dashboardParamCouple[1] = nativeVal;
+                        }
+                    } else {
+                        dashboardParamCouple[1] = nativeVal;
+                    }
+                }
 
+ 
+                // --- 3. UDS ROTATOR LOGIC (Turbo Mode) ---
+                if (currentTime - last_sent_uds_parameter_request_Time >= dynamicInterval) {
+ 
+                    idToRequest = 0xFFFF; // Reset target for this turn
+ 
+                    if (idLeft >= UDS_STOP_ID) { // --- GROUP MODE (idLeft rules) ---
+                        for (int g = 0; g < 10; g++) {
+                            if (uds_params_groups_array[g].groupId == UDS_STOP_ID) break;
+                            if (uds_params_groups_array[g].groupId == idLeft) {
+ 
+                                // Turbo Loop: Skip Natives and find next UDS
+                                for (uint8_t i = 0; i < 4; i++) {
+                                    uint8_t cId = uds_params_groups_array[g].udsParamId[group_step % 4];
+ 
+                                    if (cId >= UDS_STOP_ID) { // let's check if it is not our placeholder
+                                        group_step = 0;
+                                        break;
+                                    }
+ 
+                                    if (cId < MAX_UDS_PARAMS) {
+                                        if (single_uds_params_array[cId].reqId <= 0xFF) {
+                                            // NATIVE: Instant update, move to next slot in same cycle
+                                            uds_values_cache[cId] = getNativeParam(cId);
+                                            group_step++;
+                                        } else {
+                                            // UDS: Found CAN target
+                                            idToRequest = (uint16_t)cId;
+                                            break;
+                                        }
+                                    } else {
+                                        group_step = 0; // Guard/Empty reset
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    } else { // --- COUPLE/SINGLE MODE ---
+                        currentParamElementSelection = (idLeft == idRight) ? 0 : !currentParamElementSelection;
+                        uint8_t coupleTarget = (currentParamElementSelection == 0) ? idLeft : idRight;
+ 
+                        if (coupleTarget < MAX_UDS_PARAMS) {
+                            if (single_uds_params_array[coupleTarget].reqId <= 0xFF) {
+                                // NATIVE: Update and force next check soon
+                                uds_values_cache[coupleTarget] = getNativeParam(coupleTarget);
+                                last_sent_uds_parameter_request_Time = currentTime - (dynamicInterval - 50);
+                            } else {
+                                idToRequest = (uint16_t)coupleTarget;
+                            }
+                        }
+                    }
+ 
+                    // --- 4. EXECUTE CAN REQUEST ---
+                    if (idToRequest < MAX_UDS_PARAMS) {
+                        actuallyRequestedUdsId = (uint8_t)idToRequest;
+ 
+                        uds_parameter_request_msg_header.ExtId = single_uds_params_array[idToRequest].reqId;
+                        memcpy(&uds_parameter_request_msg_data, &single_uds_params_array[idToRequest].reqData, single_uds_params_array[idToRequest].reqLen);
+                        uds_parameter_request_msg_header.DLC = single_uds_params_array[idToRequest].reqLen;
+ 
+                        can_tx(&uds_parameter_request_msg_header, uds_parameter_request_msg_data);
+ 
+                        last_sent_uds_parameter_request_Time = currentTime;
+                        if (idLeft >= UDS_STOP_ID) group_step++;
+                    } else if (idLeft >= UDS_STOP_ID) {
+                        // Keep the loop alive if only Natives were processed
+                        last_sent_uds_parameter_request_Time = currentTime;
+                    }
+                } //end of if (currentTime - last_sent_uds_parameter_request_Time >= dynamicInterval)
+            } // end of if(main_dashboardPageIndex == 1)
+            break;
+    } //end of the switch(dashboard_menu_indent_level)
+ 
+    // --- 5. DISPLAY REFRESH ---
+    if (currentTime - lastDisplayUpdateTime >= 500) {
+        if (dashboard_menu_indent_level > 0) {
+            switch (main_dashboardPageIndex) {
+                case 1:  sendDashboardPageToSlaveBaccable(); break;             //parameters screens
+                case 9:  sendSetupDashboardPageToSlaveBaccable(); break;        //setup menu
+                case 10: sendParamsSetupDashboardPageToSlaveBaccable(); break;  //params setup menu
+            }
+            lastDisplayUpdateTime = currentTime;
+        }
+    }
+}
+/* @netzmark: END */
+ 
 		//pumpForce test25/07/2026 - BEGIN
 		// -----------------------------------------------------------------------
 		// PUMP FORCE — Innesco sequenza UDS e invio periodico IO Control
@@ -701,7 +949,7 @@
 		// pumpForceStateMachine va a 0xFF (inattivo) → nessun re-invio automatico.
 		// -----------------------------------------------------------------------
 		if (function_pump_force_enabled) {
-
+ 
 			// Innesco iniziale: prima esecuzione dopo 10s, macchina ferma (stato 0xFF) per test
 			/*
 			if (pumpForceStateMachine == 0xFF && currentTime > 10000) {
@@ -715,7 +963,7 @@
 				lastPumpForceMsgTime = currentTime;  // timestamp di inizio per calcolo timeout
 			}
 			*/
-
+ 
 			// Timeout handshake (stati 0, 1, 2): se non arriva risposta entro 500ms → abbandona
 			// Il booleano function_pump_force_enabled NON viene reimpostato (nessun retry)
 			if (pumpForceStateMachine < 3 && pumpForceStateMachine != 0xFF) {
@@ -723,7 +971,7 @@
 					pumpForceStateMachine = 0xFF; // timeout: sequenza abortita definitivamente
 				}
 			}
-
+ 
 			// Stato 3: accesso sicurezza concesso → invia IO Control ogni 200ms
 			// pumpForceTxHeader (DLC=6) e pumpForceTxData ([05,2F,50,11,03,FF,...])
 			// sono stati impostati in processingExtendedMessage.c alla transizione 2→3
@@ -736,10 +984,10 @@
 		}
 		//pumpForce test25/07/2026 - END
 	}
-
+ 
 	//verifies if message sent to schizzaforte was correctly applied
 	uint8_t mapCommandNotApplied(void){
-
+ 
 		switch(function_pedal_booster_enabled){
 			case 0: //0=disabled
 				//return 0; //not required to set map
@@ -761,7 +1009,7 @@
 					default:
 						//
 				}
-
+ 
 				break;
 			case 2: //2=Bypass
 				if(currentSchizzaforteMap=='B') return 0; //map applied
@@ -790,15 +1038,15 @@
 			default:
 				//return 1; //not correctly applied
 		}
-
+ 
 		return 1; //not correctly applied
 	}
-
+ 
 	void sendMainDashboardPageToSlaveBaccable(){
 		uint8_t tmpStrLen=0;
 		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
 		char tmpfloatString[5]; //temp array
-
+ 
 		// 4WD disabled overlay management // 4wd constraint relax change 24/08/2026
 		// writes go straight into uartTxMsg (the transient send buffer), never into
 		// dashboard_main_menu_array: that array is persistent menu label storage, and many
@@ -820,7 +1068,7 @@
 				return; // 4wd constraint relax change 24/08/2026
 			} // 4wd constraint relax change 24/08/2026
 		} // 4wd constraint relax change 24/08/2026
-
+ 
 		//update records if required
 		switch(main_dashboardPageIndex){
 			case 2: //READ_FAULTS_ENABLED //readFaults 12/08/2026
@@ -921,7 +1169,7 @@
 					addToUARTSendQueue(stopTheCarMsg, 13);//print message "stop the car"
 					return;
 				}
-
+ 
 				if(printEnableDyno>0){
 					printEnableDyno--;
 					uint8_t enableDynoMsg[12]={BhBusIDparamString,'E','N','A','B','L','E',' ','D','Y','N','O'};
@@ -953,7 +1201,7 @@
 					if(launch_assist_enabled==1){
 						if(torque>50){ //assist active and torque greather than minimum threshold. the minimum thr allows to view the menu "...assist" before the following string is printed
 							//prepare variables
-
+ 
 							//show torque
 							dashboard_main_menu_array[main_dashboardPageIndex][0]='L';
 							dashboard_main_menu_array[main_dashboardPageIndex][1]='a';
@@ -962,7 +1210,7 @@
 							dashboard_main_menu_array[main_dashboardPageIndex][4]='c';
 							dashboard_main_menu_array[main_dashboardPageIndex][5]='h';
 							dashboard_main_menu_array[main_dashboardPageIndex][6]=' ';
-
+ 
 							floatToStr(tmpfloatString,(float)torque,0,4);
 							switch(strlen(tmpfloatString)){
 								case 1:
@@ -981,11 +1229,11 @@
 									dashboard_main_menu_array[main_dashboardPageIndex][9]=tmpfloatString[2];
 									break;
 							}
-
+ 
 							dashboard_main_menu_array[main_dashboardPageIndex][10]='N';
 							dashboard_main_menu_array[main_dashboardPageIndex][11]='m';
 							dashboard_main_menu_array[main_dashboardPageIndex][12]='/';
-
+ 
 							floatToStr(tmpfloatString,(float)launch_torque_threshold,0,4);
 							if(strlen(tmpfloatString)==2){
 								dashboard_main_menu_array[main_dashboardPageIndex][13]=' ';
@@ -996,7 +1244,7 @@
 								dashboard_main_menu_array[main_dashboardPageIndex][14]=tmpfloatString[1];
 								dashboard_main_menu_array[main_dashboardPageIndex][15]=tmpfloatString[2];
 							}
-
+ 
 							dashboard_main_menu_array[main_dashboardPageIndex][16]='N';
 							dashboard_main_menu_array[main_dashboardPageIndex][17]='m';
 						}else{
@@ -1060,7 +1308,7 @@
 				//nothing to do
 				break;
 		}
-
+ 
 		//add string to record
 		switch(main_dashboardPageIndex){
 			case 0:
@@ -1075,18 +1323,18 @@
 				memcpy(&uartTxMsg[1], dashboard_main_menu_array[main_dashboardPageIndex],UART_BUFFER_SIZE-1);
 				break;
 		}
-
-
-
+ 
+ 
+ 
 		//send to slave baccable
 		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
-
+ 
 	}
-
+ 
 	void sendSetupDashboardPageToSlaveBaccable(){
 		//uint8_t tmpStrLen=0;
 		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
-
+ 
 		char tmpfloatString[5]; //temp array for shift and launch threshods
 		//update records if required
 		switch(setup_dashboardPageIndex){
@@ -1106,8 +1354,8 @@
 					dashboard_setup_menu_array[setup_dashboardPageIndex][14]=tmpfloatString[1];
 					dashboard_setup_menu_array[setup_dashboardPageIndex][15]=tmpfloatString[2];
 				}
-
-
+ 
+ 
 				break;
 			case 3: //{'[',' ',']','L','e','d',' ','C','o','n','t','r','o','l','l','e','r',},
 				dashboard_setup_menu_array[setup_dashboardPageIndex][0]=checkbox_symbols[function_led_strip_controller_enabled];
@@ -1194,8 +1442,8 @@
 						dashboard_setup_menu_array[setup_dashboardPageIndex][15]='r';
 						dashboard_setup_menu_array[setup_dashboardPageIndex][16]=' ';
 						dashboard_setup_menu_array[setup_dashboardPageIndex][17]=' ';
-
-
+ 
+ 
 						break;
 					case 1: //Auto
 						dashboard_setup_menu_array[setup_dashboardPageIndex][10]='.';
@@ -1357,14 +1605,14 @@
 			default:
 				break;
 		}
-
+ 
 		memcpy(&uartTxMsg[1], &dashboard_setup_menu_array[setup_dashboardPageIndex],UART_BUFFER_SIZE-1);
 		//send to slave baccable
 		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
-
-
+ 
+ 
 	}
-
+ 
 	void sendParamsSetupDashboardPageToSlaveBaccable(){
 		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
 		switch(params_setup_dashboardPageIndex){
@@ -1387,26 +1635,26 @@
 				uartTxMsg[16]=0;
 				uartTxMsg[17]=0;
 				uartTxMsg[18]=0;
-
+ 
 				break;
 			default: //hidden or shown params
 				uartTxMsg[1]=checkbox_symbols[shownParamsArray[params_setup_dashboardPageIndex-1]];
 				uartTxMsg[2]=' ';
 				uartTxMsg[3]=' ';
-
+ 
 				char tmpName[DASHBOARD_MESSAGE_MAX_LENGTH + 5];
-
+ 
 				memcpy(
 				    tmpName,
 				    uds_params_array[function_is_diesel_enabled][params_setup_dashboardPageIndex - 1].name,
 				    strlen(uds_params_array[function_is_diesel_enabled][params_setup_dashboardPageIndex - 1].name) + 1
 				);
-
+ 
 				uint8_t tmpStrLen=removePatterns(tmpName); //remove special patterns from template
 				if(tmpStrLen>UART_BUFFER_SIZE-4) tmpStrLen=UART_BUFFER_SIZE-4;
 				memcpy(&uartTxMsg[4], tmpName,tmpStrLen); //copy entire string, to fill it with 0 at the end.
 				memset(&uartTxMsg[4+tmpStrLen], 0x20, UART_BUFFER_SIZE-4-tmpStrLen);
-
+ 
 				//uint8_t tmpStrLenName=strlen((char *)uds_params_array[function_is_diesel_enabled][params_setup_dashboardPageIndex-1].name);
 				//uint8_t tmpStrLenUnits=strlen((char *)single_uds_params_array[uds_params_array[function_is_diesel_enabled][params_setup_dashboardPageIndex-1].udsParamId[currentParamElementSelection]].replyMeasurementUnit);
 				//uint8_t tmpCharsToWrite=UART_BUFFER_SIZE-4-tmpStrLenName; //number of chars that we can still use in the string
@@ -1416,19 +1664,20 @@
 				//	tmpCharsToWrite--;
 				//}
 				//if(tmpCharsToWrite>0) memcpy(&uartTxMsg[4+tmpStrLenName+1], &single_uds_params_array[uds_params_array[function_is_diesel_enabled][params_setup_dashboardPageIndex-1].udsParamId[currentParamElementSelection]].replyMeasurementUnit,tmpCharsToWrite);
-
+ 
 				break;
 		}
-
+ 
 		//send to slave baccable
 		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
-
-
+ 
+ 
 	}
-
+ 
+/* Gaucho ori code
 	void sendDashboardPageToSlaveBaccable(){
 		uartTxMsg[0]= BhBusIDparamString;//first char shall be a # to talk with slave canable connected to BH can bus
-
+ 
 		// 4WD disabled overlay management // 4wd constraint relax change 24/08/2026
 		if(function_4wd_disabler_enabled && _4wd_disabled > 0) { // 4wd constraint relax change 24/08/2026
 			if(currentTime - last_4wd_disabled_overlay_time >= 5000) { // 4wd constraint relax change 24/08/2026
@@ -1446,22 +1695,94 @@
 				return; // 4wd constraint relax change 24/08/2026
 			} // 4wd constraint relax change 24/08/2026
 		} // 4wd constraint relax change 24/08/2026
-
+ 
 		char stringToPrint[25];
 		buildLineWithFormat( uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name ,  dashboardParamCouple, uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId, stringToPrint); //build string to print
-
+ 
 		uint8_t tmpStrLen=strlen(stringToPrint);
 		if(tmpStrLen>DASHBOARD_MESSAGE_MAX_LENGTH) tmpStrLen=DASHBOARD_MESSAGE_MAX_LENGTH; //truncate it. no space left
 		memcpy(&uartTxMsg[1], &stringToPrint,tmpStrLen); //prepare name of parameter
-
+ 
 		if (tmpStrLen < DASHBOARD_MESSAGE_MAX_LENGTH) { //if required pad with zeros
 			memset(&uartTxMsg[1+tmpStrLen], ' ', UART_BUFFER_SIZE-(1+tmpStrLen)); //set to zero remaining chars
 		}
 		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
 	}
-
+ 
+	*/
+ 
+	/* @netzmark: to create multi parameters screens */
+	void sendDashboardPageToSlaveBaccable() {
+	    // Set header so the Slave (BH) recognizes this as a dashboard string command
+	    uartTxMsg[0] = BhBusIDparamString;
+ 
+	    // 4WD disabled overlay management // 4wd constraint relax change 24/08/2026
+	    if(function_4wd_disabler_enabled && _4wd_disabled > 0) { // 4wd constraint relax change 24/08/2026
+	        if(currentTime - last_4wd_disabled_overlay_time >= 5000) { // 4wd constraint relax change 24/08/2026
+	            last_4wd_disabled_overlay_time = currentTime; // 4wd constraint relax change 24/08/2026
+	            show_4wd_disabled_overlay = 1; // 4wd constraint relax change 24/08/2026
+	        } // 4wd constraint relax change 24/08/2026
+	        if(show_4wd_disabled_overlay) { // 4wd constraint relax change 24/08/2026
+	            if(currentTime - last_4wd_disabled_overlay_time > 1000) { // 4wd constraint relax change 24/08/2026
+	                show_4wd_disabled_overlay = 0; // 1 sec elapsed. hide overlay // 4wd constraint relax change 24/08/2026
+	            } // 4wd constraint relax change 24/08/2026
+ 
+	            // Safety adaptation: Wipe with '\0' instead of ' ' to match netzmark engine safety standard
+	            memset(&uartTxMsg[1], '\0', DASHBOARD_MESSAGE_MAX_LENGTH); // 4wd constraint relax change 24/08/2026
+	            uint8_t msg[] = ">>4WD DISABLED<<"; // 4wd constraint relax change 24/08/2026
+	            memcpy(&uartTxMsg[1], msg, 16); // 4wd constraint relax change 24/08/2026
+ 
+	            // Calculate dynamic packet size for overlay to ensure clean termination
+	            uint8_t toSendOverlay = 16 + 2;
+	            if (toSendOverlay > (DASHBOARD_MESSAGE_MAX_LENGTH + 1)) {
+	                toSendOverlay = DASHBOARD_MESSAGE_MAX_LENGTH + 1;
+	            }
+ 
+	            addToUARTSendQueue(uartTxMsg, toSendOverlay); // 4wd constraint relax change 24/08/2026
+	            return; // 4wd constraint relax change 24/08/2026
+	        } // 4wd constraint relax change 24/08/2026
+	    } // 4wd constraint relax change 24/08/2026
+ 
+	    // Initialize workspace buffer with zeros to prevent garbage during string construction
+	    char stringToPrint[64] = {0};
+ 
+	    // Get pointers for the current dashboard page based on engine type and page index
+	    const char* tpl = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].name;
+	    const uint8_t* ids = uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId;
+ 
+	    // Fill stringToPrint with formatted data (converts UDS IDs to human-readable values)
+	    buildLineWithFormat(tpl, dashboardParamCouple, ids, stringToPrint);
+ 
+	    // Calculate text length and enforce the physical screen limit (e.g., 30 chars)
+	    uint8_t tmpStrLen = strlen(stringToPrint);
+	    if(tmpStrLen > DASHBOARD_MESSAGE_MAX_LENGTH) {
+	        tmpStrLen = DASHBOARD_MESSAGE_MAX_LENGTH;
+	    }
+ 
+	    // IMPORTANT: Wipe the UART buffer with NULLs before copying.
+	    // This ensures that even if the Slave's memory is "dirty", it receives clean data.
+	    memset(&uartTxMsg[1], '\0', DASHBOARD_MESSAGE_MAX_LENGTH);
+ 
+	    // Copy the truncated string into the UART transmit buffer
+	    memcpy(&uartTxMsg[1], stringToPrint, tmpStrLen);
+ 
+	    // Calculate total packet size: Header(1) + Text(tmpStrLen) + NULL Terminator(1)
+	    // Sending +2 ensures at least one NULL byte follows the text, killing "ü-umlaut" at 28 characters bug.
+	    uint8_t toSend = tmpStrLen + 2;
+ 
+	    // Final safety check to stay within the physical bounds of the uartTxMsg array
+	    if (toSend > (DASHBOARD_MESSAGE_MAX_LENGTH + 1)) {
+	        toSend = DASHBOARD_MESSAGE_MAX_LENGTH + 1;
+	    }
+ 
+	    // Push the clean, null-terminated frame to the UART transmission queue
+	    addToUARTSendQueue(uartTxMsg, toSend);
+	}
+ 
+	/* @netzmark - END */
+ 
 	float getNativeParam(uint8_t paramId){
-
+ 
 		switch(paramId){ //do preliminary additional stuff for special parameters (not uds)
 			case 0: //print oil pressure
 				return (float) oilPressure * single_uds_params_array[paramId].replyScale;
@@ -1516,21 +1837,28 @@
 			case 17://Pedal current Map
 				return currentSchizzaforteMap;
 				break;
+			case 18://get byte0 of 41A
+				return (float)last_41A_raw_data[2];		// RAW Byte 2 - @netzmark: IBS behaviour testing reasons
+				break;
+			case 19: //get byte1 of 41A
+				return (float)last_41A_raw_data[3];		// RAW Byte 3 - @netzmark: IBS behaviour testing reasons
+			    break;
 			default:
 				break;
 		}
 		return 0;
 		}
-
+ 
 	//buildLineWithFormat composes string to print, starting from template string and float parameters
 	// syntax: $n.yf or $enum
 	// n = 0..6 (integer part), y = 0..3 (decimal)
-
+ 
+	/* Gaucho ori code
 	void buildLineWithFormat(const char* template, float values[2], const uint8_t paramId[2], char* result) {
 		//onboardLed_red_blink(5);
 	    int i = 0;   // indice output
 	    int which = 0; // 0 = val1, 1 = val2
-
+ 
 	    for (const char* p = template; *p && i < DASHBOARD_MESSAGE_MAX_LENGTH; p++) {
 	        if (*p == '$'){ //special char. it could be a param in the format $x.yf or in the format $enum
 	        	if (*(p+2) == '.'){ //it should be a param in the format $x.yf
@@ -1539,9 +1867,9 @@
 							int n = *(p+1) - '0'; // parte intera max
 							int y = *(p+3) - '0'; // decimali
 							int maxLen = n + (y>0 ? 1 : 0) + y;
-
+ 
 							char buf[maxLen+1]; // buffer dimensionato sul campo
-
+ 
 							switch(single_uds_params_array[paramId[which]].reqId){
 								case 0x1A: //0-100 stat
 									if(values[which]>20.0){ //missed
@@ -1583,20 +1911,20 @@
 										for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
 									}
 									break;
-
+ 
 								default:
 									floatToStr(buf, values[which], y, maxLen+1);
-
+ 
 									for (char* q=buf; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH && (q-buf)<maxLen; q++) result[i++] = *q;
 							}
-
-
+ 
+ 
 							which++;
 							p += 4; // salta "n.yf"
 	        			}else { result[i++] = *p; }
 	        		}else { result[i++] = *p; }
 	        	}else if (*(p+4) == 'm'){ //$enum enumerator
-
+ 
 	        		switch(single_uds_params_array[paramId[which]].reqId){
 						case 0x17: //if Current gear request data - currentGear
 							if ((uint8_t)values[which]<11){
@@ -1609,7 +1937,7 @@
 							if((uint8_t)values[which]>6) values[which]=7;
 							for (const char* q=dpfRegenEnumStrings[(uint8_t)values[which]]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q;
 							break;
-
+ 
 						case 0x1E:
 							if((uint8_t)values[which]>1) values[which]=2;
 							for (const char* q=setbeltEnumStrings[(uint8_t)values[which]]; *q && i<DASHBOARD_MESSAGE_MAX_LENGTH ; q++) result[i++] = *q;
@@ -1645,7 +1973,134 @@
 	    }
 	    result[i] = '\0';
 	}
-
+	*/
+ 
+			/* @netzmark: void buildLineWithFormat updated to create multi parameters screens */
+	void buildLineWithFormat(const char* template, float *values, const uint8_t *paramIds, char *result) {
+	    uint8_t i = 0, which = 0;
+	    uint8_t idLeft = paramIds[0];
+	    uint8_t idRight = paramIds[1];
+	    const uds_params_group_element* activeGroup = NULL;
+ 
+	    // 1. GROUP DETECTION (Left Rules)
+	    if (idLeft >= UDS_STOP_ID) {
+	    	for (uint8_t g = 0; g < (255 - UDS_STOP_ID + 1); g++) {
+	            if (uds_params_groups_array[g].groupId == idLeft) {
+	                activeGroup = &uds_params_groups_array[g];
+	                break;
+	            }
+	            if (uds_params_groups_array[g].groupId == UDS_STOP_ID) break;
+	        }
+	    }
+ 
+	    for (const char* p = template; *p && i < 63; p++) {
+	        if (*p == '$') {
+	            // --- ID SELECTION ---
+	            uint8_t currentId;
+	            if (activeGroup) {
+	                currentId = activeGroup->udsParamId[which % 4];
+	            } else {
+	                if (which == 0) currentId = idLeft;
+	                else if (which == 1) currentId = (idRight >= UDS_STOP_ID) ? idLeft : idRight;
+	                else currentId = UDS_STOP_ID;
+	            }
+ 
+	            // --- DATA FETCHING (Unified Logic with Max Hold) ---
+	            float valToPrint = NAN;
+				if (currentId < MAX_UDS_PARAMS) {
+					if (maxHold_enabled && which < 2 && !activeGroup) {
+						//valToPrint = dashboardParamCouple[which];
+						valToPrint = values[which];
+					} else if (single_uds_params_array[currentId].reqId <= 0xFF) {
+						valToPrint = getNativeParam(currentId);
+					} else {
+						valToPrint = uds_values_cache[currentId];
+					}
+				}
+ 
+	            // --- A. ENUM/SPECIAL HANDLER ($enum or $m) ---
+	            if (*(p+1) == 'e' || *(p+4) == 'm') {
+	            	uint8_t rId = (currentId < MAX_UDS_PARAMS) ? single_uds_params_array[currentId].reqId : 0;
+	                switch(rId) {
+	                    case 0x17: // Gear
+	                        if (i < 63) result[i++] = ((uint8_t)valToPrint < 11) ? gearArray[(uint8_t)valToPrint] : '-';
+	                        break;
+	                    case 0x1E: // Seatbelt
+	                        {
+	                            const char* sbt = (valToPrint < 0.5f) ? "ON " : "OFF";
+	                            for (const char* q = sbt; *q && i < 63; q++) result[i++] = *q;
+	                        }
+	                        break;
+	                    case 0x20: // DNA Mode
+	                        if(i < 63) {
+	                            switch(currentDNAmode) {
+	                                case 0x00: result[i++]='N'; break;
+	                                case 0x08: result[i++]='D'; break;
+	                                case 0x10: result[i++]='A'; break;
+	                                case 0x30: result[i++]='R'; break;
+	                                default:   result[i++]='?';
+	                            }
+	                        }
+	                        break;
+	                }
+	                which++; p += 4; continue;
+	            }
+ 
+	            // --- B. FLOAT & STATS HANDLER ($1.1f) ---
+	            if (*(p+2) == '.') {
+	                int n = *(p+1) - '0';
+	                int y = *(p+3) - '0';
+	                int maxLen = n + (y > 0 ? 1 : 0) + y;
+	                uint8_t rId = (currentId < MAX_UDS_PARAMS) ? single_uds_params_array[currentId].reqId : 0;
+ 
+	                switch(rId) {
+	                    case 0x1A: // 0-100 stat
+	                        if(valToPrint > 20.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else if(statistics_0_100_started) {
+	                            for (const char* q=speedStatisticEnumStrings[1]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1B: // 100-200 stat
+	                        if(valToPrint > 40.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else if(statistics_100_200_started) {
+	                            for (const char* q=speedStatisticEnumStrings[1]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1C: // Best 0-100
+	                        if(valToPrint > 20.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    case 0x1D: // Best 100-200
+	                        if(valToPrint > 40.0f) {
+	                            for (const char* q=speedStatisticEnumStrings[0]; *q && i<63; q++) result[i++] = *q;
+	                        } else {
+	                            appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        }
+	                        break;
+	                    default:
+	                        appendFloatRightAligned(result, &i, 64, valToPrint, y, maxLen);
+	                        break;
+	                }
+	                which++; p += 4; continue; // @netzmark UCINANIE ZNAKU
+	                //which++; p += 3; continue;
+	            }
+	        }
+	        if (i < 63) result[i++] = *p;
+	    }
+	    result[i] = '\0';
+	}
+ 
+	/* @netzmark - END */
+ 
 	uint8_t removePatterns(char *str) {
 	    char *p;
 	    while ((p = strstr(str, "$")) != NULL) {
@@ -1661,10 +2116,10 @@
 	        str = p + 1; // continuo la ricerca
 	    }
 	    return (uint8_t)strlen(str);
-
+ 
 	}
-
-
+ 
+ 
 	/**
 	 * Calcola la RAM libera approssimativa
 	 * Ritorna: bytes di RAM libera tra heap e stack
@@ -1672,19 +2127,19 @@
 	uint32_t getFreeRAM(void) {
 	    uint32_t stack_top;
 	    uint32_t heap_end = (uint32_t)&_end;
-
+ 
 	    // Ottieni il valore corrente dello stack pointer
 	    stack_top = (uint32_t)__get_MSP();
-
+ 
 	    // La RAM libera è lo spazio tra la fine dell'heap e lo stack corrente
 	    if (stack_top > heap_end) {
 	        return stack_top - heap_end;
 	    }
 	    return 0;
 	}
-
-
-
+ 
+ 
+ 
 	void clearDashboardBaccableMenu(){
 		//prepare empty message
 		uartTxMsg[0]=BhBusIDparamString; //# to send message to baccable slave connected to BH can bus
@@ -1693,9 +2148,9 @@
 		}
 		//send it
 		addToUARTSendQueue(uartTxMsg, UART_BUFFER_SIZE);
-
+ 
 	}
-
+ 
 	// this function scales value received from can bus. It is assumed that pedal position (or motor rpm) will change vumeter volume represented with the leds strip
 	float scaleVolume(uint8_t vol){
 		//Scale this value to get a percentage between 0 and 100
@@ -1705,7 +2160,7 @@
 		}
 		return (float)(((float)vol*100.0f)/180.0f);
 	}
-
+ 
 	// this function scales value received from can bus. It is assumed that gear selection will change the color effect of the leds strip
 	uint8_t scaleColorSet(uint8_t col){
 		//id 2ef, primo byte, 70=r, 00=n, f0=marcia inserita ma frizione premuta (indefinito), 10=prima, 20=seconda..
@@ -1714,12 +2169,12 @@
 		// 7=backward, f=gear set but frizione premuta (undefined), 1=first gear , 2=second gear, ... , 6= sixt gear
 		return col;
 	}
-
+ 
 	uint8_t saveOnflash(){ //store params permanently on flash
 		//last page to store on flash is 0x0801 F800 (we can store 2 bytes each time)
 		// and we shall erase entire page before write. one page size is FLASH_PAGE_SIZE (2048 bytes in st32F072)
 		HAL_FLASH_Unlock(); //unlock flash
-
+ 
 		//erase flash
 		FLASH_EraseInitTypeDef eraseInitStruct;
 		uint32_t pageError=0;
@@ -1731,7 +2186,7 @@
 			onboardLed_red_blink(8);
 			return 254; //error
 		}
-
+ 
 		//it seems that stm32F072 supports only writing 2byte words
 		//write parameter
 		uint8_t paramsNumber=32; //elm327 function 26/08/2026 - was 31
@@ -1769,7 +2224,7 @@
 		  snifferFunctionEnabled,  //slot 31: SNIFFER //sniffer function 24/08/2026
 		  elm327FunctionEnabled,  //slot 32: ELM327 //elm327 function 26/08/2026
 		};
-
+ 
 		for (uint8_t i = 0; i < paramsNumber; i++) {
 		    if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, LAST_PAGE_ADDRESS + (i * 4), params[i]) != HAL_OK) {
 		        HAL_FLASH_Lock();
@@ -1777,16 +2232,16 @@
 		        return 255;
 		    }
 		}
-
+ 
 		//lock the flash
 		HAL_FLASH_Lock();
 		return 0;
 	}
-
+ 
 	uint8_t resetStatisticsOnFlash(){
-
+ 
 	HAL_FLASH_Unlock(); //unlock flash
-
+ 
 			//erase flash
 			FLASH_EraseInitTypeDef eraseInitStruct;
 			uint32_t pageError=0;
@@ -1801,7 +2256,7 @@
 			HAL_FLASH_Lock();
 			return 0;
 	}
-
+ 
 	uint8_t saveStatisticsOnFlash(){
 		//compare current stats with best stored times
 		uint8_t weShallWriteFlash=0;
@@ -1812,18 +2267,18 @@
 		}else{
 			params[0]=(uint16_t)(readStatisticsFromFlash(1) * 1000);
 		}
-
+ 
 		if(chronometerElapsedTime_100_200_km_h<readStatisticsFromFlash(2)){
 			params[1]=(uint16_t)(chronometerElapsedTime_100_200_km_h *1000);
 			weShallWriteFlash=1;
 		}else{
 			params[1]=(uint16_t)(readStatisticsFromFlash(2) * 1000);
 		}
-
-
+ 
+ 
 		if(weShallWriteFlash){ //if new best time was found, save again all stats
 			HAL_FLASH_Unlock(); //unlock flash
-
+ 
 			//erase flash
 			FLASH_EraseInitTypeDef eraseInitStruct;
 			uint32_t pageError=0;
@@ -1835,10 +2290,10 @@
 				onboardLed_red_blink(8);
 				return 254; //error
 			}
-
+ 
 			//it seems that stm32F072 supports only writing 2byte words
 			//write parameter
-
+ 
 			for (uint8_t i = 0; i < 9; i++) {
 				if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, LAST_PAGE_ADDRESS_STATISTICS + (i * 4), params[i]) != HAL_OK) {
 					HAL_FLASH_Lock();
@@ -1846,16 +2301,16 @@
 					return 255;
 				}
 			}
-
+ 
 			//lock the flash
 			HAL_FLASH_Lock();
 			return 0;
-
+ 
 		}
 		return 253;
 	}
-
-
+ 
+ 
 	uint8_t saveShownParamsOnflash(){
 		//compare current stats with best stored times
 		uint8_t weShallWriteFlash=0;
@@ -1863,7 +2318,7 @@
 		weShallWriteFlash=1;
 		if(weShallWriteFlash){ //save shown params
 			HAL_FLASH_Unlock(); //unlock flash
-
+ 
 			//erase flash
 			FLASH_EraseInitTypeDef eraseInitStruct;
 			uint32_t pageError=0;
@@ -1875,13 +2330,13 @@
 				onboardLed_red_blink(8);
 				return 254; //error
 			}
-
+ 
 			//let's prepare variables
 			compress_to_uint16(shownParamsArray, total_pages_in_params_setup_dashboard_menu, params);
-
+ 
 			//it seems that stm32F072 supports only writing 2byte words
 			//write parameter
-
+ 
 			for (uint8_t i = 0; i < 30; i++) {
 				if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, LAST_PAGE_ADDRESS_SHOWN_PARAMS + (i * 4), params[i]) != HAL_OK) {
 					HAL_FLASH_Lock();
@@ -1889,42 +2344,42 @@
 					return 255;
 				}
 			}
-
+ 
 			//lock the flash
 			HAL_FLASH_Lock();
 			return 0;
-
+ 
 		}
 		return 253;
 	}
-
+ 
 	void compress_to_uint16(const uint8_t *input, size_t input_len, uint16_t *output) {
 	    size_t out_index = 0;
 	    uint16_t acc = 0;
 	    uint8_t bit_count = 0;
-
+ 
 	    for (size_t i = 0; i < input_len; ++i) {
 	        acc = (acc << 1) | (input[i] & 1); // inserisce il bit in MSB-first
 	        bit_count++;
-
+ 
 	        if (bit_count == 16) {
 	            output[out_index++] = acc;
 	            acc = 0;
 	            bit_count = 0;
 	        }
 	    }
-
+ 
 	    // Scrive l'ultimo uint16_t se ci sono bit residui
 	    if (bit_count > 0) {
 	        acc <<= (16 - bit_count); // allinea i bit a sinistra
 	        output[out_index] = acc;
 	    }
 	}
-
-
+ 
+ 
 	void decompress_from_uint16(const uint16_t *input, size_t input_len, uint8_t *output, size_t output_len) {
 	    size_t out_index = 0;
-
+ 
 	    for (size_t i = 0; i < input_len && out_index < output_len; ++i) {
 	        uint16_t value = input[i];
 	        for (int b = 15; b >= 0 && out_index < output_len; --b) {
@@ -1932,27 +2387,27 @@
 	        }
 	    }
 	}
-
+ 
 	void readShownParamsFromFlash(){
 		//read from flash
 		uint16_t params[30];
 		for (uint8_t b = 0; b<30; b++) {
 			params[b]=*(volatile uint16_t*)(LAST_PAGE_ADDRESS_SHOWN_PARAMS+(b*4));
 		}
-
+ 
 		//decompress
 		decompress_from_uint16(params, 30, shownParamsArray, 240);
-
+ 
 		}
-
+ 
 	float readStatisticsFromFlash(uint8_t paramId){ // 1=0-100km/h, 2=100/200km/h
 		if(paramId<1) return 0;
 		uint16_t tmpParam=*(volatile uint16_t*)(LAST_PAGE_ADDRESS_STATISTICS+((paramId-1)*4));
-
+ 
 		return (float)(((float)tmpParam)/1000.0);
-
+ 
 	}
-
+ 
 	uint16_t readFromFlash(uint8_t paramId){
 		if(paramId<1) return 0;
 		uint16_t tmpParam=*(volatile uint16_t*)(LAST_PAGE_ADDRESS+((paramId-1)*4));
@@ -2239,9 +2694,9 @@
 		}
 		return tmpParam;
 	}
-
+ 
 	uint8_t getParamIndexFromReqId(uint32_t searchedReqId){
-
+ 
 		for (uint8_t i=0;i<total_pages_in_params_setup_dashboard_menu;i++){
 			if(single_uds_params_array[uds_params_array[function_is_diesel_enabled][i].udsParamId[0]].reqId==searchedReqId) return i;
 		}
@@ -2251,51 +2706,51 @@
 		}
 		return 0; //means not found, or param0 (it could be an exception)
 	}
-
-
-
-
+ 
+ 
+ 
+ 
 	uint8_t getNextVisibleParam(uint8_t curIndex) {
-
+ 
 	    uint8_t index = curIndex;
 	    while (index < total_pages_in_params_setup_dashboard_menu && !shownParamsArray[index]) index++;
-
+ 
 	    if (index >= total_pages_in_params_setup_dashboard_menu) index = 0; //if all hidden, restart from the beginning
 	    while (index < curIndex && !shownParamsArray[index]) index++;
-
+ 
 	    return index;
 	}
-
+ 
 	uint8_t getPreviousVisibleParam(uint8_t curIndex) {
-
+ 
 	    uint8_t index = curIndex;
 	    while (index >= 0 && !shownParamsArray[index]) index--;
-
+ 
 	    if (index >= total_pages_in_params_setup_dashboard_menu) index = total_pages_in_params_setup_dashboard_menu-1; //if all hidden, restart from the end
 	    while (index > curIndex && !shownParamsArray[index]) index--;
-
+ 
 	    return index;
 	}
-
+ 
 	// Event-driven max hold update for native CAN parameters.
 	// Called directly at the extraction point of each native CAN variable,
 	// so peaks are captured at CAN bus rate (e.g. every 10ms) rather than at the 500ms display cycle.
 	// Only updates dashboardParamMaxHold; display (dashboardParamCouple) is still refreshed at 500ms.
 	// Fast-returns if max hold is inactive or the params view is not shown.
 	void nativeMaxHoldUpdate(uint8_t paramId){
-		if(!maxHold_enabled || dashboard_menu_indent_level!=1 || main_dashboardPageIndex!=1 || !baccableDashboardMenuVisible) return;
-		for(uint8_t sel=0; sel<2; sel++){
-			if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[sel]==paramId){
-				if(!isnan(dashboardParamCouple[sel])){ //only after the 500ms cycle has set the initial value
-					float value=getNativeParam(paramId);
-					if(value > dashboardParamMaxHold[sel]){
-						dashboardParamMaxHold[sel]=value;
-					}
-				}
-				break;
-			}
-		}
+	    if(!maxHold_enabled || dashboard_menu_indent_level!=1 || main_dashboardPageIndex!=1 || !baccableDashboardMenuVisible) return;
+	    for(uint8_t sel=0; sel<2; sel++){
+	        if(uds_params_array[function_is_diesel_enabled][dashboardPageIndex].udsParamId[sel]==paramId){
+	            if(!isnan(dashboardParamCouple[sel])){ //only after the 500ms cycle has set the initial value
+	                float value=getNativeParam(paramId);
+	                if(value > dashboardParamCouple[sel]){
+	                    dashboardParamCouple[sel]=value;
+	                }
+	            }
+	            break;
+	        }
+	    }
 	}
-
-
+ 
+ 
 #endif

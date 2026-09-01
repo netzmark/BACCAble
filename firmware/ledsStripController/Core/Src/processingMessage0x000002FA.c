@@ -8,6 +8,38 @@
 #include "debug.h"
 #include "processingMessage0x000002FA.h"
 
+	/* @netzmark to speed-up clicks reaction */
+#if defined(C1baccable)
+
+    extern uint32_t lastDisplayUpdateTime;
+    extern uint16_t dynamicInterval;
+    extern uint8_t group_step;
+
+	void resetDashboardTimers(void) {
+	    // 1. We reserve quiet on Serial after click
+	    lastDisplayUpdateTime = currentTime - 500;
+
+	    // 2. Set default interval to avoid 0 - the same like in C1baccable.c
+	    dynamicInterval = 200;
+
+	    // 3. Set UDS request after 10ms (fluent new page start)
+	    last_sent_uds_parameter_request_Time = currentTime - dynamicInterval;
+
+	    // 4. Clean UDS cache
+	    for(int i = 0; i < MAX_UDS_PARAMS; i++) {
+	        uds_values_cache[i] = NAN;
+	    }
+
+	    // Clean UART to BH data
+	    dashboardParamCouple[0] = NAN;
+	    dashboardParamCouple[1] = NAN;
+
+	    group_step = 0;
+	}
+
+#endif
+    /* @netzmark - end */
+
 void processingMessage0x000002FA(){
 	// Button is pressed on left area of the wheel
 	// These Buttons are detected only if the main panel of the car is on.
@@ -25,12 +57,8 @@ void processingMessage0x000002FA(){
 	#endif
 
 	#if defined(C1baccable)
-
-
-
-
+	
 	  	//function ACC Virtual Pad
-
 		if(function_acc_virtual_pad_enabled==1){
 			switch (rx_msg_data[0]){
 				case 0x12: //CC on
@@ -63,38 +91,90 @@ void processingMessage0x000002FA(){
 			}
 		}
 
+			//Gaucho ori code
+//		if(function_acc_autostart){
+//			if(ACC_engaged){
+//				if(carSteadyCounter==200 && brakeIntervention_ACC_ESC_ASR){ //if car is steady and brake is pressed by ACC
+//					if(rx_msg_data[0]==0x10){ //if no button was pressed on cruise control pad
+//						if (currentTime-lastSentAutostartMsg>500){
+//							rx_msg_data[0] = 0x90; //Res button press
+//
+//							if(function_acc_autostart==2){
+//								rx_msg_data[0] = 0x08; //ACC gently up button press
+//							}
+//							rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16); //increase the counter
+//							rx_msg_data[2]=calculateCRC(rx_msg_data,rx_msg_header.DLC); //update checksum
+//
+//							can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data); //send message to simulate RES button press
+//							rx_msg_data[0]=0x10; //restore value 10 to avoid unwanted behaviours with subsequent pieces of code
+//							//increase a counter
+//							AutostartMsgCounter++;
+//							if (AutostartMsgCounter>= 5){
+//								AutostartMsgCounter=0;
+//								lastSentAutostartMsg=currentTime;
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+
+		//@netzmark corrected code
 		if(function_acc_autostart){
-			if(ACC_engaged){
-				if(carSteadyCounter==200 && brakeIntervention_ACC_ESC_ASR){ //if car is steady and brake is pressed by ACC
-					if(rx_msg_data[0]==0x10){ //if no button was pressed on cruise control pad
-						if (currentTime-lastSentAutostartMsg>500){ //once each 1,5 seconds
-							rx_msg_data[0] = 0x90; //Res button press
+		    if(ACC_engaged){
 
-							if(function_acc_autostart==2){
-								rx_msg_data[0] = 0x08; //ACC gently up button press
-							}
-							rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16); //increase the counter
-							rx_msg_data[2]=calculateCRC(rx_msg_data,rx_msg_header.DLC); //update checksum
+		        if(carSteadyCounter == 200 && brakeIntervention_ACC_ESC_ASR == 1){
 
-							can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data); //send message to simulate RES button press
-							rx_msg_data[0]=0x10; //restore value 10 to avoid unwanted behaviours with subsequent pieces of code
-							//increase a counter
-							AutostartMsgCounter++;
-							if (AutostartMsgCounter>= 5){ //we are simulating a 100msec button press event
-								AutostartMsgCounter=0;
-								lastSentAutostartMsg=currentTime;
-							}
-						}
-					}
-				}
-			}
+		            if (autostartActiveBurst == 0) {
+		                if (currentTime - lastSentAutostartMsg > 450) { //real 450ms pause
+		                    autostartActiveBurst = 1;
+		                }
+		            }
+
+		            // 5 frames repetitions synchronised with original 0x10
+		            if (autostartActiveBurst == 1) {
+		                if(rx_msg_data[0] == 0x10){
+
+		                    rx_msg_data[0] = 0x90; // RES button press
+		                    if(function_acc_autostart == 2){
+		                        rx_msg_data[0] = 0x08; // ACC gently up button press
+		                    }
+
+		                    rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16);
+		                    rx_msg_data[2] = calculateCRC(rx_msg_data, rx_msg_header.DLC);
+
+		                    can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data);
+
+		                    rx_msg_data[0] = 0x10;
+
+		                    AutostartMsgCounter++;
+
+		                    if (AutostartMsgCounter >= 5) {
+		                        AutostartMsgCounter = 0;
+		                        lastSentAutostartMsg = currentTime;
+		                        autostartActiveBurst = 0;
+		                    }
+		                }
+		            }
+		        }
+
+		        // Just for any case
+		        if(carSteadyCounter < 200 || brakeIntervention_ACC_ESC_ASR == 0){
+		            AutostartMsgCounter = 0;
+		            autostartActiveBurst = 0;
+		        }
+
+		    }
 		}
+
+
 
 		if(cruiseControlDisabled && ACC_Disabled){ //if we are allowed to press buttons, use them in baccable menu
 			switch(rx_msg_data[0]){
 				case 0x18://if cruise control speed reduction button was pressed, user wants to see next page
 					if(wheelPressedButtonID==0x10 && baccableDashboardMenuVisible){ //if button released, use pressed button
 						wheelPressedButtonID=0x18; //avoid to return here
+						resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 						if(commandsMenuEnabled){
 							switch(dashboard_menu_indent_level){
 								case 0: //main menu
@@ -104,29 +184,28 @@ void processingMessage0x000002FA(){
 										if(main_dashboardPageIndex==2) main_dashboardPageIndex++;
 									}
 
-
 									if(function_clear_faults_enabled==0){
 										if(main_dashboardPageIndex==3) main_dashboardPageIndex++;
 									}
 
-									if(function_dyno_mode_master_enabled==0){
+									if(function_dyno_mode_master_enabled==0){	 	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex++;
 									}
 
-									if(function_esc_tc_customizator_enabled==0){
-										if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
-									}
+//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick										if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
+//									}
+
 									if(function_front_brake_forcer_master==0){
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex++;
 									}
 
-									if(function_4wd_disabler_enabled==0){
+//									if(function_4wd_disabler_enabled==0){	 		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex++;
-									}
+//									}
 
-									if(HAS_function_enabled==0){
+//									if(HAS_function_enabled==0){		 			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex++;
-									}
+//									}
 
 									if(QV_exhaust_flap_function_enabled==0){
 										if(main_dashboardPageIndex==12) main_dashboardPageIndex++;
@@ -183,6 +262,7 @@ void processingMessage0x000002FA(){
 				case 0x20://if cruise control speed strong reduction button was pressed, user wants to jump 10 pages forward
 						if(wheelPressedButtonID==0x18 && baccableDashboardMenuVisible){ //if button released, use pressed button
 							wheelPressedButtonID=0x20; //avoid to return here
+							resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 							if(commandsMenuEnabled){
 								switch(dashboard_menu_indent_level){
 									case 0: //main menu
@@ -197,9 +277,11 @@ void processingMessage0x000002FA(){
 										if(function_dyno_mode_master_enabled==0){
 											if(main_dashboardPageIndex==5) main_dashboardPageIndex++;
 										}
+
 										if(function_esc_tc_customizator_enabled==0){
 											if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
 										}
+
 										if(function_front_brake_forcer_master==0){
 											if(main_dashboardPageIndex==7) main_dashboardPageIndex++;
 										}
@@ -264,6 +346,7 @@ void processingMessage0x000002FA(){
 				case 0x08: //if cruise control speed increase button was pressed, user wants to see previous page
 					if(wheelPressedButtonID==0x10 && baccableDashboardMenuVisible){ //if button released, use pressed button
 						wheelPressedButtonID=0x08; //avoid to enter again here
+						resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 						if(commandsMenuEnabled){
 							switch(dashboard_menu_indent_level){
 								case 0: //main menu
@@ -275,21 +358,22 @@ void processingMessage0x000002FA(){
 										if(main_dashboardPageIndex==12) main_dashboardPageIndex--;
 									}
 
-									if(HAS_function_enabled==0){
+//									if(HAS_function_enabled==0){				 	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex--;
-									}
+//									}
 
-
-									if(function_4wd_disabler_enabled==0){
+//									if(function_4wd_disabler_enabled==0){			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex--;
-										}
+//										}
 
 									if(function_front_brake_forcer_master==0){
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex--;
 									}
-									if(function_esc_tc_customizator_enabled==0){
+									
+//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==6) main_dashboardPageIndex--;
-									}
+//									}
+
 									if(function_dyno_mode_master_enabled==0){
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex--;
 									}
@@ -347,6 +431,7 @@ void processingMessage0x000002FA(){
 				case 0x00: //if cruise control speed strong increase button was pressed, user wants to jump 10 pages before
 						if(wheelPressedButtonID==0x08 && baccableDashboardMenuVisible){
 							wheelPressedButtonID=0x00; //avoid to return here
+							resetDashboardTimers(); // @netzmark to speed-up clicks reaction
 							if(commandsMenuEnabled){
 								switch(dashboard_menu_indent_level){
 									case 0: //main menu
@@ -543,10 +628,22 @@ void processingMessage0x000002FA(){
 										}
 									}
 									break;
+									//* @netzmark change
+//								case 9: //setup menu
+//								case 10: //params setup menu
+//									dashboard_menu_indent_level++;
+//									break;
 								case 9: //setup menu
+								    dashboard_menu_indent_level++;
+								    resetDashboardTimers(); //@netzmark to speed-up clicks reaction
+								    sendSetupDashboardPageToSlaveBaccable();
+								    break;
 								case 10: //params setup menu
-									dashboard_menu_indent_level++;
-									break;
+								    dashboard_menu_indent_level++;
+								    resetDashboardTimers(); //@netzmark to speed-up clicks reaction
+								    sendParamsSetupDashboardPageToSlaveBaccable();
+								    break;
+								    // @netzmark change
 								case 11: //toggle HAS function
 									HAS_buttonPressRequested=5;
 									//inform Slave baccable C2
@@ -818,7 +915,7 @@ void processingMessage0x000002FA(){
 										default:
 											break;
 									}
-
+									resetDashboardTimers(); //@netzmark to speed-up clicks reaction XX
 									sendSetupDashboardPageToSlaveBaccable();
 									break;
 								case 2: //read faults - ritorna al menu principale //readFaults 12/08/2026
@@ -831,15 +928,20 @@ void processingMessage0x000002FA(){
 										case 0: //{'S','A','V','E','&','E','X','I','T',},
 											saveShownParamsOnflash();
 											dashboard_menu_indent_level=0;
+											resetDashboardTimers(); //@netzmark to speed-up clicks reaction XX
+											sendMainDashboardPageToSlaveBaccable(); //@netzmark to speed-up clicks reaction XX
 											break;
 										default: //toggle hidden variable of current param
 											shownParamsArray[params_setup_dashboardPageIndex-1]=!shownParamsArray[params_setup_dashboardPageIndex-1];
+											resetDashboardTimers();  //@netzmark to speed-up clicks reaction XX
+											sendParamsSetupDashboardPageToSlaveBaccable();  //@netzmark to speed-up clicks reaction XX
 											break;
 									}
 									break;
 								default:
 									//we want to return main menu
 									dashboard_menu_indent_level=0;
+									resetDashboardTimers();  //@netzmark to speed-up clicks reaction XX
 									sendMainDashboardPageToSlaveBaccable(); //print menu
 							}
 						}
@@ -891,7 +993,7 @@ void processingMessage0x000002FA(){
 					if(currentGear==0){ //gear is neutral
 						if((rx_msg_data[0]==0x08) && ((wheelPressedButtonID==0x10) || (wheelPressedButtonID==0x08))){ //user is pressing CC soft speed up button and it was previously released (or pressed by baccable menu up here)
 							lastPressedSpeedUpWheelButtonDuration++;
-							if(lastPressedSpeedUpWheelButtonDuration>620){ //around 20 seconds
+							if(lastPressedSpeedUpWheelButtonDuration>422){ 	// @netzmark: originally it was 1267 (around 30s), I do it faster around 10s.
 								//avoid to return here
 								wheelPressedButtonID=0xF8; //invent a new status to differentiate it from 0x08 used in baccable menu few lines of code up here
 								lastPressedSpeedUpWheelButtonDuration=0; //unuseful here since it is done when button is released. just to be superstitious :-D.

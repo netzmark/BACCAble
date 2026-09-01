@@ -23,7 +23,7 @@
 	#define ENGINE_NSC_DE_SOX_REGEN		4
 	#define ENGINE_SCR_HEATUP_STRATEGY	5
 
-	#define UART_BUFFER_SIZE DASHBOARD_MESSAGE_MAX_LENGTH + 1
+	#define UART_BUFFER_SIZE (DASHBOARD_MESSAGE_MAX_LENGTH + 5) // @netzmark: really necessary to get safely the full 28 characters on the large telematic screen
 
 	#define UART1_BUFFER_SIZE 9  //legth for schizzaforte messages
 
@@ -192,6 +192,9 @@
 		extern uint8_t dashboardPageIndex; //to send message index - it changes when you press cruise control buttons
 		extern uint32_t last_sent_uds_parameter_request_Time; //stores last time we send a uds parameter request
 
+		extern uint8_t last_41A_raw_data[8];	// stores entire 41A frame data, @netzmark - to cheat IBS
+		extern volatile uint8_t new_41A_flag;	// info that 41A has been refreshed, @netzmark - to cheat IBS
+
 		extern uint8_t dieselEngineRegenerationMode; //0=None, 1=DPF_REGEN_LO, 2=DPF_REGEN_HI, 3=NSC_DE_NOX_REGEN, 4=NSC_DE_SOX_REGEN, 5=SCR_HEATUP_STRATEGY
 
 		//
@@ -299,6 +302,7 @@
 		extern uint32_t lastSentAutostartMsg;
 		extern uint8_t AutostartMsgCounter;
 		extern uint8_t brakeIntervention_ACC_ESC_ASR;
+		extern volatile uint8_t autostartActiveBurst; //@netzmark Autostart improvement
 
 		//CLOSE_WINDOWS
 		extern uint8_t function_close_windows_with_door_lock;
@@ -391,7 +395,7 @@
 		extern CAN_TxHeaderTypeDef rearBrakeMsgHeader[4];
 		extern uint8_t rearBrakeMsgData[4][8]; //from last to first we have: diag session, tester present, IO Control - Short Term Adjustment(disable front brakes) (periodic)
 
-		extern uint8_t reverseGearActive;
+		//extern uint8_t reverseGearActive;
 		extern uint8_t parkSensorsFunctionStatus; //0=park sensors off, anything else=on
 		extern uint8_t parkSensorsLedStatus; //0=off, 1=continuous, 2=blink
 
@@ -600,6 +604,7 @@
 	extern uint8_t parkMirrorOperativePositionNotStored;
 	extern uint32_t exitReverseTime; //@netzmark parkingMirror returning delay
 	extern uint32_t neutralGearEntryTime; //park mirror - moment Neutral (currentGear==0x00) was entered, 0 when not in Neutral
+	extern uint32_t exitReverseTime; //@netzmark parkingMirror returning delay
 
 	//HAS_FUNCTION_ENABLED
 	extern uint8_t HAS_function_enabled;
@@ -617,6 +622,35 @@
 	extern uint8_t usbConnectedToBH;
 
 
+
+
+	// @netzmark PDC code - begin
+	//PDC_AUTO_DISABLE
+	#if defined(C2baccable)
+		extern volatile uint8_t pdc_state_disabled;
+		extern volatile uint8_t pdc_is_beeping;
+		extern volatile uint8_t pdc_auto_disabled;
+		extern volatile uint8_t requestToTogglePDC;
+		extern volatile uint8_t reverseGearActive;
+		extern uint8_t pdcMsgData[8];
+		extern CAN_TxHeaderTypeDef pdcMsgHeader;
+		extern volatile int pdc_send_counter;
+		extern volatile uint32_t last_pdc_shot_time;
+		extern volatile uint8_t vehicle_is_moving;
+	#endif
+	// @netzmark PDC code - end
+
+	// @netzmark MUTE_ON_REVERSE code - begin
+	//MUTE_ON_REVERSE
+	#if defined(BHbaccable)
+		extern volatile uint8_t audioSystemMuted;             // 0 = play, 1 = muted (updated via CAN 0x5BE)
+		extern uint8_t audioSystemReverseMuted;               // 0 = idle, 1 = muted by us, 2 = skipped (manual mute active)
+		extern volatile uint8_t centerConsoleRxMsgData[6];    // stores pure radio panel status (updated via CAN 0x358)
+		extern uint8_t centerConsoleTxMsgData[6];             // buffer used to modify and send the CAN injection message
+		extern CAN_TxHeaderTypeDef centerConsoleTxMsgHeader;  // CAN TX header definition for 0x358 message
+		extern uint32_t exitReverseAudioTime;                 // countdown timer for audio restoration hysteresis
+	#endif
+	//@netzmark MUTE_ON_REVERSE code - end
 
 
 #endif /* INC_GLOBALVARIABLES_H_ */
