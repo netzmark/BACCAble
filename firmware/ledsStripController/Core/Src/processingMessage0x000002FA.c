@@ -71,9 +71,11 @@ void processingMessage0x000002FA(){
 					onboardLed_blue_on();
 					break;
 				case 0x90: //RES pressed
-					if (newWheelPressedButtonID==0x10 && ACC_engaged) ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED=1; //if begin to press button RES and ACC is Engaged, set ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED
+					//if (newWheelPressedButtonID==0x10 && ACC_engaged) ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED=1; //if begin to press button RES and ACC is Engaged, set ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED
+					if (newWheelPressedButtonID==0x10 && (ACC_status>1) && (ACC_status!=5)) ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED=1; //if we begin to press RES button and ACC is Engaged, set ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED
 					newWheelPressedButtonID=0x90; //store the new RES button status (pressed)
-					if (ACC_engaged && ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED){
+					//i(ACC_engaged && ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED){
+					if ((ACC_status>1) && (ACC_status!=5) && ACC_WAS_ENGAGED_WHEN_RES_WAS_PRESSED){
 						//simulate the distance button press
 						memcpy(ACC_msg_data, &rx_msg_data, rx_msg_header.DLC);
 						ACC_msg_data[0] = 0x50; //ACC distance change
@@ -119,57 +121,50 @@ void processingMessage0x000002FA(){
 //			}
 //		}
 
-		//@netzmark corrected code
+		// --- @netzmark OPTIMIZED ADAPTIVE CRUISE CONTROL AUTOSTART SYSTEM ---
 		if(function_acc_autostart){
-		    if(ACC_engaged){
+		    //if(ACC_engaged){
+			if((ACC_status>1) && (ACC_status!=5)){
 
+		        // Condition: Vehicle has been completely steady for 2 seconds (carSteadyCounter == 200)
+		        // and the ACC/ESC system is actively holding the vehicle with brakes.
 		        if(carSteadyCounter == 200 && brakeIntervention_ACC_ESC_ASR == 1){
 
-		            if (autostartActiveBurst == 0) {
-		                if (currentTime - lastSentAutostartMsg > 450) { //real 450ms pause
-		                    autostartActiveBurst = 1;
-		                }
-		            }
+		            // Intercept the original 0x10 frame coming from the steering wheel pad
+		            if(rx_msg_data[0] == 0x10){
 
-		            // 5 frames repetitions synchronised with original 0x10
-		            if (autostartActiveBurst == 1) {
-		                if(rx_msg_data[0] == 0x10){
+		                // [THROTTLE FIX]: Instead of blind delays or spamming every single frame,
+		                // we intercept EVERY SECOND frame (~40ms interval). This is dense enough
+		                // for the Bosch radar to react instantly, while keeping the CAN bus stable.
+		                static uint8_t skipEverySecondFrame = 0;
+		                skipEverySecondFrame = !skipEverySecondFrame;
 
-		                    rx_msg_data[0] = 0x90; // RES button press
+		                if(skipEverySecondFrame) {
+
+		                    // Overwrite with the desired button command to trigger autostart
+		                    rx_msg_data[0] = 0x90; // Simulate RES button press
 		                    if(function_acc_autostart == 2){
-		                        rx_msg_data[0] = 0x08; // ACC gently up button press
+		                        rx_msg_data[0] = 0x08; // Simulate ACC gently up button press
 		                    }
 
+		                    // Safely increment the rolling counter and calculate the new CRC
 		                    rx_msg_data[1] = (rx_msg_data[1] & 0xF0) | (((rx_msg_data[1] & 0x0F) + 1) % 16);
 		                    rx_msg_data[2] = calculateCRC(rx_msg_data, rx_msg_header.DLC);
 
+		                    // Transmit the injection frame instantly using STM32 hardware bxCAN
 		                    can_tx((CAN_TxHeaderTypeDef *)&rx_msg_header, rx_msg_data);
 
+		                    // RESTORE: Instantly recover the buffer byte to avoid breaking downstream code logic
 		                    rx_msg_data[0] = 0x10;
-
-		                    AutostartMsgCounter++;
-
-		                    if (AutostartMsgCounter >= 5) {
-		                        AutostartMsgCounter = 0;
-		                        lastSentAutostartMsg = currentTime;
-		                        autostartActiveBurst = 0;
-		                    }
 		                }
 		            }
 		        }
-
-		        // Just for any case
-		        if(carSteadyCounter < 200 || brakeIntervention_ACC_ESC_ASR == 0){
-		            AutostartMsgCounter = 0;
-		            autostartActiveBurst = 0;
-		        }
-
 		    }
 		}
 
 
-
-		if(cruiseControlDisabled && ACC_Disabled){ //if we are allowed to press buttons, use them in baccable menu
+		//if(cruiseControlDisabled && ACC_Disabled){ //if we are allowed to press buttons, use them in baccable menu
+		if(cruiseControlDisabled && (ACC_status==0)){ //if we are allowed to press buttons (CC and ACC disabled), use them in baccable menu
 			switch(rx_msg_data[0]){
 				case 0x18://if cruise control speed reduction button was pressed, user wants to see next page
 					if(wheelPressedButtonID==0x10 && baccableDashboardMenuVisible){ //if button released, use pressed button
@@ -188,20 +183,21 @@ void processingMessage0x000002FA(){
 										if(main_dashboardPageIndex==3) main_dashboardPageIndex++;
 									}
 
-									if(function_dyno_mode_master_enabled==0){	 	// @netzmark to skip not needed info, it should be still visible at longClick
+									if(function_dyno_mode_master_enabled==0){
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex++;
 									}
 
-//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick										if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
+//									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick
+										if(main_dashboardPageIndex==6) main_dashboardPageIndex++;
 //									}
 
 									if(function_front_brake_forcer_master==0){
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex++;
 									}
 
-//									if(function_4wd_disabler_enabled==0){	 		// @netzmark to skip not needed info, it should be still visible at longClick
+									if(function_4wd_disabler_enabled==0){
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex++;
-//									}
+									}
 
 //									if(HAS_function_enabled==0){		 			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex++;
@@ -213,6 +209,7 @@ void processingMessage0x000002FA(){
 
 									if(main_dashboardPageIndex>=dashboard_main_menu_array_len)  main_dashboardPageIndex=0; // make a rotative menu
 									//onboardLed_blue_on();
+
 									sendMainDashboardPageToSlaveBaccable();//send dashboard page via usb
 									break;
 								case 1:
@@ -354,9 +351,9 @@ void processingMessage0x000002FA(){
 
 									if(main_dashboardPageIndex>=dashboard_main_menu_array_len)  main_dashboardPageIndex=dashboard_main_menu_array_len-1; // make a rotative menu
 
-									if(QV_exhaust_flap_function_enabled==0){
+//									if(QV_exhaust_flap_function_enabled==0){		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==12) main_dashboardPageIndex--;
-									}
+//									}
 
 //									if(HAS_function_enabled==0){				 	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==11) main_dashboardPageIndex--;
@@ -366,25 +363,27 @@ void processingMessage0x000002FA(){
 										if(main_dashboardPageIndex==8) main_dashboardPageIndex--;
 //										}
 
-									if(function_front_brake_forcer_master==0){
+//									if(function_front_brake_forcer_master==0){		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==7) main_dashboardPageIndex--;
-									}
+//									}
 									
 //									if(function_esc_tc_customizator_enabled==0){	// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==6) main_dashboardPageIndex--;
 //									}
 
-									if(function_dyno_mode_master_enabled==0){
+//									if(function_dyno_mode_master_enabled==0){		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==5) main_dashboardPageIndex--;
-									}
+//									}
 
-									if(function_clear_faults_enabled==0){
+//									if(function_clear_faults_enabled==0){			// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==3) main_dashboardPageIndex--;
-									}
-									if(function_read_faults_enabled==0){
+//									}
+
+//										if(function_read_faults_enabled==0){		// @netzmark to skip not needed info, it should be still visible at longClick
 										if(main_dashboardPageIndex==2) main_dashboardPageIndex--;
-									}
+//									}
 									//onboardLed_blue_on();
+
 									sendMainDashboardPageToSlaveBaccable();//send dashboard page via usb
 									break;
 								case 1:
@@ -988,7 +987,8 @@ void processingMessage0x000002FA(){
 		}
 
 		#ifndef PERMANENTLY_DISABLE_IMMO
-			if(cruiseControlDisabled && ACC_Disabled ){ //if we are allowed to use the buttons of the cruise control
+			//if(cruiseControlDisabled && ACC_Disabled ){ //if we are allowed to use the buttons of the cruise control
+			if(cruiseControlDisabled && (ACC_status==0) ){ //if we are allowed to use the buttons of the cruise control
 				if (currentRpmSpeed>400){ //if motor is on
 					if(currentGear==0){ //gear is neutral
 						if((rx_msg_data[0]==0x08) && ((wheelPressedButtonID==0x10) || (wheelPressedButtonID==0x08))){ //user is pressing CC soft speed up button and it was previously released (or pressed by baccable menu up here)
