@@ -250,8 +250,13 @@ const char *FW_VERSION=_FW_VERSION;
 
 	//
 	uint8_t cruiseControlDisabled=1;
-	uint8_t ACC_Disabled=1;
-	uint8_t ACC_engaged=0;
+	//uint8_t ACC_Disabled=1;
+	//uint8_t ACC_engaged=0;
+	uint8_t ACC_status=0; 	//Legend: 0=Off, 1=Enabled, 2=Engaged, 3=EngagedBrakeOnly, 4=EngagedOverride, 5=Cancel, 6=SuggestionEngaged, 7=SuggestionOverride
+							//note: 5 is fired when acc is engaged and you press brake, so acc becomes not engaged
+							//note: 4 and 7 are fired when acc is engaged and you press accelerator
+
+
 	uint8_t wheelPressedButtonID=0x10; //0x10= released, 0x20=strong speed decrease, 0x18=speed decrease, 0x00=strong speed increase, 0x08=speed increase, 0x90=RES, CC on/off=0x12
 	uint8_t  lastPressedWheelButton=0xff; //default value, means no button pressed on the wheel
 	uint32_t lastPressedWheelButtonTime=0;//stores the last time a wheel button was pressed, in msec from boot
@@ -665,11 +670,13 @@ uint8_t usbConnectedToBH=0; //sniffer function 24/08/2026
 //MUTE_ON_REVERSE
 #if defined(BHbaccable)
 	volatile uint8_t audioSystemMuted = 0;          // 0 = play, 1 = muted
-	uint8_t audioSystemReverseMuted = 0;            // Main loop state machine rigger
+	uint8_t audioSystemMutedByUs = 0;				// 0 = play, 1 = muted
+	uint8_t audioSystemReverseMuted = 0;            // Main loop state machine trigger
 	volatile uint8_t centerConsoleRxMsgData[6] = {0x0F, 0x7F, 0x80, 0x00, 0x00, 0x00}; // audio panel and volume status
 	uint8_t centerConsoleTxMsgData[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	CAN_TxHeaderTypeDef centerConsoleTxMsgHeader = {.IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .StdId = 0x358, .DLC = 6};
 	uint32_t exitReverseAudioTime = 0;
+	uint32_t lastMuteSpamTime = 0;
 #endif
 //@netzmark MUTE_ON_REVERSE code - end
 

@@ -175,7 +175,7 @@ void processingStandardMessage(){
 		                vehicle_is_moving = 0;
 		            }
 		            if (vehicle_is_moving == 1) {
-		                onboardLed_red_on();
+		                //onboardLed_red_on();
 		            }
 		        }
 		    #endif
@@ -934,7 +934,7 @@ void processingStandardMessage(){
 			//last two bytes of the message are 00 00.
 			break;
 		case 0x0000073C:
-			//73C[7] @netzmark description:
+			//73C[7] @netzmark description (my21 and autostart2 mode):
 			//0000 0100 - ACC off
 			//0001 0100 - ACC on (but speed not engaged)
 			//0010 0100 - engaged, car speed decelerating
@@ -945,8 +945,10 @@ void processingStandardMessage(){
 
 			#if defined(C1baccable)
 				if(rx_msg_header.DLC>=8){
+					//switch ((rx_msg_data[7]>>4) & 0x03) { //@netzmark change to get normal working with ISC enabled
 					//switch ((rx_msg_data[7]>>4) & 0x07) { //ori Gaucho code
-					switch ((rx_msg_data[7]>>4) & 0x03) { //@netzmark change to get normal working with ISC enabled
+					ACC_status=(rx_msg_data[7]>>4) & 0x07; //Legend: 0=Off, 1=Enabled, 2=Engaged, 3=EngagedBrakeOnly, 4=EngagedOverride, 5=Cancel, 6=SuggestionEngaged, 7=SuggestionOverride
+					/*
 						case 0x00: //ACC is off
 							//onboardLed_red_on();
 							ACC_Disabled=1; //enable additional parameter menu commands
@@ -960,6 +962,7 @@ void processingStandardMessage(){
 							ACC_Disabled=0; //disable additional parameter menu commands
 							ACC_engaged=0; //acc not engaged
 					}
+					*/
 				}
 			#endif
 			//contains status of ACC on byte 7, from bit 6 to 4 (0=disabled, 1=enabled, 2=engaged 3=engaged brake only, 4=override, 5=cancel)

@@ -199,8 +199,13 @@
 
 		//
 		extern uint8_t cruiseControlDisabled;
-		extern uint8_t ACC_Disabled;
-		extern uint8_t ACC_engaged;
+		//extern uint8_t ACC_Disabled;
+		//extern uint8_t ACC_engaged;
+		extern uint8_t ACC_status; 	//Legend: 0=Off, 1=Enabled, 2=Engaged, 3=EngagedBrakeOnly, 4=EngagedOverride, 5=Cancel, 6=SuggestionEngaged, 7=SuggestionOverride
+									//note: 5 is fired when acc is engaged and you press brake, so acc becomes not engaged
+									//note: 4 and 7 are fired when acc is engaged and you press accelerator
+
+
 		extern uint8_t wheelPressedButtonID; //0x10= released, 0x20=strong speed decrease, 0x18=speed decrease, 0x00=strong speed increase, 0x08=speed increase, 0x90=RES, CC on/off=0x12
 		extern uint8_t  lastPressedWheelButton; //default value, means no button pressed on the wheel
 		extern uint32_t lastPressedWheelButtonTime;//stores the last time a wheel button was pressed, in msec from boot
@@ -644,11 +649,13 @@
 	//MUTE_ON_REVERSE
 	#if defined(BHbaccable)
 		extern volatile uint8_t audioSystemMuted;             // 0 = play, 1 = muted (updated via CAN 0x5BE)
+		extern uint8_t audioSystemMutedByUs;	              // 0 = play, 1 = muted (changed by our code)
 		extern uint8_t audioSystemReverseMuted;               // 0 = idle, 1 = muted by us, 2 = skipped (manual mute active)
 		extern volatile uint8_t centerConsoleRxMsgData[6];    // stores pure radio panel status (updated via CAN 0x358)
 		extern uint8_t centerConsoleTxMsgData[6];             // buffer used to modify and send the CAN injection message
 		extern CAN_TxHeaderTypeDef centerConsoleTxMsgHeader;  // CAN TX header definition for 0x358 message
 		extern uint32_t exitReverseAudioTime;                 // countdown timer for audio restoration hysteresis
+		extern uint32_t lastMuteSpamTime;
 	#endif
 	//@netzmark MUTE_ON_REVERSE code - end
 
