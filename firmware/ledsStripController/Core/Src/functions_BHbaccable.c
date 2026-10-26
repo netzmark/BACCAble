@@ -213,71 +213,251 @@
 
 
 		// --- REVERSE AUDIO MUTE SYSTEM ---
+//		#define reverseAutoMuteEnabled 1
+//		if(reverseAutoMuteEnabled){
+//
+//			// 1. STATE: REVERSE GEAR (0x0E) - Activate mute or log manual bypass
+//			if(currentGear == 0x0E) {
+//				exitReverseAudioTime = 0; // Reset timer while in Reverse
+//
+//				if(audioSystemReverseMuted == 0) {
+//					if(audioSystemMuted == 0) {
+//						// Music is playing -> copy from pure radio buffer and inject Mute button
+//						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+//						centerConsoleTxMsgData[2] = 0xE0; // Press Mute
+//						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+//
+//						audioSystemReverseMuted = 1; // Locked by our automation (Safe rygiel)
+//					} else {
+//						audioSystemReverseMuted = 2; // User already muted the radio, bypass automation permanently
+//					}
+//				}
+//			}
+//			// 2. STATE: PARKING (0x0D) OR NEUTRAL (0x00) - Immediate restoration (Only for state 1)
+//			else if(currentGear == 0x0D || currentGear == 0x00) {
+//				exitReverseAudioTime = 0;
+//
+//				if(audioSystemReverseMuted == 1) { // Process ONLY if muted by us
+//					if(audioSystemMuted == 1) { // Double check if radio is still muted
+//						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+//						centerConsoleTxMsgData[2] = 0xE0; // Press Mute again to toggle PLAY
+//						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+//					}
+//				}
+//				audioSystemReverseMuted = 0; // Safe reset to idle for both state 1 and 2
+//			}
+//			// 3. STATE: DRIVE (D) OR ANY OTHER GEAR - Safe delay only for automation
+//			else {
+//				// [NEW SAFE FIX]: If user manually unmuted on R, clear the state instantly on D entry (no delay needed)
+//				if(audioSystemReverseMuted == 1 && audioSystemMuted == 0) {
+//					audioSystemReverseMuted = 0;
+//					exitReverseAudioTime = 0;
+//				}
+//
+//				// If bypass state 2 is active, clear it instantly when moving forward (no delay needed)
+//				if(audioSystemReverseMuted == 2) {
+//					audioSystemReverseMuted = 0;
+//					exitReverseAudioTime = 0;
+//				}
+//
+//				// If muted by us (state 1) and timer is not armed yet, start countdown
+//				if(audioSystemReverseMuted == 1 && exitReverseAudioTime == 0) {
+//					exitReverseAudioTime = currentTime;
+//				}
+//
+//				// Trigger return only after 3 seconds of constant driving forward
+//				if(exitReverseAudioTime != 0 && (currentTime - exitReverseAudioTime > 3000)) {
+//					if(audioSystemReverseMuted == 1) {
+//						if(audioSystemMuted == 1) { // Restore only if still muted
+//							memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+//							centerConsoleTxMsgData[2] = 0xE0; // Toggle back to PLAY
+//							can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+//						}
+//					}
+//					audioSystemReverseMuted = 0; // Reset state machine to idle
+//					exitReverseAudioTime = 0; // Reset timer after execution
+//				}
+//			}
+//		}
+
+
+//		#define reverseAutoMuteEnabled 1
+//		if(reverseAutoMuteEnabled){
+//
+//			// REVERSE GEAR (0x0E) - Activate mute or log manual bypass
+//			if(currentGear == 0x0E) {
+//				// ==========================================
+//				// PHASE 1: REVERSE GEAR -> AUTO-MUTE LOOPS
+//				//(the loop is necessary because after ENGINE STARTS mute button us ignored for several seconds
+//				// ==========================================
+//				exitReverseAudioTime = 0; // Reset return timer while actively in Reverse
+//
+//				// Throttle check interval to exactly 500ms to allow ETM boot/processing time
+//				if(currentTime - lastMuteSpamTime > 500) {
+//
+//					// [TRUTH CHECK]: Inject only if radio is playing (0) AND automation is idle (0)
+//					// If the system enters State 2 (Manual Bypass), this block is completely locked down.
+//					if(audioSystemMuted == 0 && audioSystemMutedByUs == 0) {
+//						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+//						centerConsoleTxMsgData[2] = 0xE0; // Press Mute button
+//						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+//
+//						// Save transmission time ONLY when the frame is actually fired
+//						lastMuteSpamTime = currentTime;
+//					} else {
+//						lastMuteSpamTime = currentTime;
+//					}
+//				}
+//
+//				// [CONFIRMED SUCCESS]: Acknowledge automation success (State 1) ONLY if radio reports muted (1)
+//				// and our module actively initiated the fight by firing a frame (lastMuteSpamTime != 0).
+//				if(audioSystemMuted == 1 && lastMuteSpamTime != 0 && audioSystemMutedByUs == 0) {
+//					audioSystemMutedByUs = 1;
+//				}
+//
+//				// [MANUAL UNMUTE BYPASS]: If automated mute was active (State 1) but user manually unmuted (0)
+//				// via the volume knob while still in R, we shift into State 2 (Bypass) to surrender control.
+//				if(audioSystemMutedByUs == 1 && audioSystemMuted == 0) {
+//					audioSystemMutedByUs = 2; // Hard bypass lock until gear shift occurs
+//				}
+//			}
+//
+//			else {
+//				// ==========================================
+//				// PHASE 2: OTHER GEARS -> DELAYED AUDIO RESTORATION
+//				// ==========================================
+//
+//				// Arm the 3-second restoration timer ONLY if audio was successfully muted by our automation (State 1)
+//				if(audioSystemMutedByUs == 1 && exitReverseAudioTime == 0) {
+//					exitReverseAudioTime = currentTime;
+//				}
+//
+//				// Trigger audio restoration after 3 seconds (3000ms) of constant forward driving or parking/neutral
+//				if(exitReverseAudioTime != 0 && (currentTime - exitReverseAudioTime > 3000)) {
+//
+//					if(audioSystemMutedByUs == 1) {
+//						if(audioSystemMuted == 1) {
+//							memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+//							centerConsoleTxMsgData[2] = 0xE0; // Press Mute again to toggle PLAY
+//							can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+//						}
+//					}
+//
+//					// Pure system reset - clear all states and clocks for the next session
+//					audioSystemMutedByUs = 0;
+//					lastMuteSpamTime = 0;
+//					exitReverseAudioTime = 0;
+//				}
+//
+//				// [BYPASS CLEANUP]: If leaving Reverse in manual bypass (State 2),
+//				// silently clear the flags without transmitting any frames to avoid breaking user choice.
+//				if(audioSystemMutedByUs == 2) {
+//					audioSystemMutedByUs = 0;
+//					lastMuteSpamTime = 0;
+//					exitReverseAudioTime = 0;
+//				}
+//			}
+//		}
+//			//@netzmark MUTE_ON_REVERSE code - end
+
+		// --- REVERSE AUDIO MUTE SYSTEM ---
 		#define reverseAutoMuteEnabled 1
-		if(reverseAutoMuteEnabled){
+		if (reverseAutoMuteEnabled) {
 
-			// 1. STATE: REVERSE GEAR (0x0E) - Activate mute or log manual bypass
-			if(currentGear == 0x0E) {
-				exitReverseAudioTime = 0; // Reset timer while in Reverse
+		    // =========================================================================
+		    // PHASE 1: REVERSE GEAR (0x0E) -> EVENT-DRIVEN AUTOMATION & FEEDBACK LOOP
+		    // =========================================================================
+		    if (currentGear == 0x0E) {
+		        exitReverseAudioTime = 0; // Reset return timer while actively in Reverse
 
-				if(audioSystemReverseMuted == 0) {
-					if(audioSystemMuted == 0) {
-						// Music is playing -> copy from pure radio buffer and inject Mute button
-						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
-						centerConsoleTxMsgData[2] = 0xE0; // Press Mute
-						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+		        // 1. INITIALIZATION: Detect initial state or intent upon entering Reverse
+		        if (audioSystemMutedByUs == 0) {
+		            if (audioSystemMuted == 1) {
+		                // User intentionally muted the radio BEFORE shifting to R -> Hard Bypass
+		                audioSystemMutedByUs = 3;
+		            } else {
+		                // Radio is playing -> Transition to ATTEMPT state and fire immediately
+		                audioSystemMutedByUs = 1;
+		                memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+		                centerConsoleTxMsgData[2] = 0xE0; // Press Mute button
+		                can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+		                lastMuteSpamTime = currentTime;
+		            }
+		        }
 
-						audioSystemReverseMuted = 1; // Locked by our automation (Safe rygiel)
-					} else {
-						audioSystemReverseMuted = 2; // User already muted the radio, bypass automation permanently
-					}
-				}
-			}
-			// 2. STATE: PARKING (0x0D) OR NEUTRAL (0x00) - Immediate restoration (Only for state 1)
-			else if(currentGear == 0x0D || currentGear == 0x00) {
-				exitReverseAudioTime = 0;
+		        // 2. THROTTLE CHECK & RETRY LOOP: Keep fighting during ETM boot time (State 1 only)
+		        if (audioSystemMutedByUs == 1 && audioSystemMuted == 0) {
+		            if (currentTime - lastMuteSpamTime > 500) {
+		                memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+		                centerConsoleTxMsgData[2] = 0xE0; // Repress Mute button
+		                can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+		                lastMuteSpamTime = currentTime;
+		            }
+		        }
 
-				if(audioSystemReverseMuted == 1) { // Process ONLY if muted by us
-					if(audioSystemMuted == 1) { // Double check if radio is still muted
-						memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
-						centerConsoleTxMsgData[2] = 0xE0; // Press Mute again to toggle PLAY
-						can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
-					}
-				}
-				audioSystemReverseMuted = 0; // Safe reset to idle for both state 1 and 2
-			}
-			// 3. STATE: DRIVE (D) OR ANY OTHER GEAR - Safe delay only for automation
-			else {
-				// [NEW SAFE FIX]: If user manually unmuted on R, clear the state instantly on D entry (no delay needed)
-				if(audioSystemReverseMuted == 1 && audioSystemMuted == 0) {
-					audioSystemReverseMuted = 0;
-					exitReverseAudioTime = 0;
-				}
+		        // 3. CONFIRMED SUCCESS: Lock automation only when radio reports muted (0x30)
+		        if (audioSystemMutedByUs == 1 && audioSystemMuted == 1) {
+		            audioSystemMutedByUs = 2;
+		        }
 
-				// If bypass state 2 is active, clear it instantly when moving forward (no delay needed)
-				if(audioSystemReverseMuted == 2) {
-					audioSystemReverseMuted = 0;
-					exitReverseAudioTime = 0;
-				}
+		        // 4. MANUAL UNMUTE BYPASS: If automated mute was successful (State 2) but user
+		        // turns the volume knob or presses mute on R, shift to State 3 to surrender control.
+		        if (audioSystemMutedByUs == 2 && audioSystemMuted == 0) {
+		            audioSystemMutedByUs = 3;
+		        }
+		    }
 
-				// If muted by us (state 1) and timer is not armed yet, start countdown
-				if(audioSystemReverseMuted == 1 && exitReverseAudioTime == 0) {
-					exitReverseAudioTime = currentTime;
-				}
+		    // =========================================================================
+		    // PHASE 2: OTHER GEARS -> IMMEDIATE (P/N) OR DELAYED (D) AUDIO RESTORATION
+		    // =========================================================================
+		    else {
+		        // SCENARIO A: IMMEDIATE RESTORATION FOR PARKING (0x0D) OR NEUTRAL (0x00)
+		        if (currentGear == 0x0D || currentGear == 0x00) {
+		            exitReverseAudioTime = 0;
 
-				// Trigger return only after 3 seconds of constant driving forward
-				if(exitReverseAudioTime != 0 && (currentTime - exitReverseAudioTime > 3000)) {
-					if(audioSystemReverseMuted == 1) {
-						if(audioSystemMuted == 1) { // Restore only if still muted
-							memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
-							centerConsoleTxMsgData[2] = 0xE0; // Toggle back to PLAY
-							can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
-						}
-					}
-					audioSystemReverseMuted = 0; // Reset state machine to idle
-					exitReverseAudioTime = 0; // Reset timer after execution
-				}
-			}
+		            if (audioSystemMutedByUs == 2) { // Process ONLY if muted by our automation
+		                if (audioSystemMuted == 1) { // Double check if radio is still muted
+		                    memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+		                    centerConsoleTxMsgData[2] = 0xE0; // Toggle back to PLAY immediately
+		                    can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+		                }
+		            }
+		            // Pure system reset to Idle
+		            audioSystemMutedByUs = 0;
+		            lastMuteSpamTime = 0;
+		        }
+
+		        // SCENARIO B: DELAYED RESTORATION FOR DRIVE (D) OR ANY OTHER FORWARD GEAR
+		        else {
+		            // Arm the 3-second restoration timer only for successful automation (State 2)
+		            if (audioSystemMutedByUs == 2 && exitReverseAudioTime == 0) {
+		                exitReverseAudioTime = currentTime;
+		            }
+
+		            // Trigger return after 3 seconds of constant driving forward
+		            if (exitReverseAudioTime != 0 && (currentTime - exitReverseAudioTime > 3000)) {
+		                if (audioSystemMutedByUs == 2) {
+		                    if (audioSystemMuted == 1) { // Restore only if still muted
+		                        memcpy(centerConsoleTxMsgData, (uint8_t*)centerConsoleRxMsgData, 6);
+		                        centerConsoleTxMsgData[2] = 0xE0; // Toggle back to PLAY
+		                        can_tx(&centerConsoleTxMsgHeader, centerConsoleTxMsgData);
+		                    }
+		                }
+		                // Pure system reset to Idle after execution
+		                audioSystemMutedByUs = 0;
+		                lastMuteSpamTime = 0;
+		                exitReverseAudioTime = 0;
+		            }
+
+		            // SCENARIO C: CLEANUP FOR BYPASS OR UNFINISHED ATTEMPTS ON FORWARD GEAR
+		            // Silently clear states without transmitting to respect manual choices or quick shifts
+		            if (audioSystemMutedByUs == 1 || audioSystemMutedByUs == 3) {
+		                audioSystemMutedByUs = 0;
+		                lastMuteSpamTime = 0;
+		                exitReverseAudioTime = 0;
+		            }
+		        }
+		    }
 		}
 		//@netzmark MUTE_ON_REVERSE code - end
 	}
